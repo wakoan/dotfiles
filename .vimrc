@@ -5,6 +5,8 @@ set number
 set hlsearch
 set incsearch
 
+set showcmd
+
 filetype off
 
 set rtp+=~/.vim/bundle/Vundle.vim
@@ -65,6 +67,8 @@ set shiftwidth=2
 set expandtab
 set smarttab
 
+autocmd Filetype python setlocal expandtab tabstop=2 shiftwidth=2
+
 syntax on
 
 set encoding=utf-8
@@ -76,9 +80,13 @@ set listchars=eol:$,tab:——,trail:~,extends:>,precedes:<,space:⋅
 set ttyfast
 set nowrap
 
-set scrolloff=3
+set autowrite
+
+set scrolloff=0
 
 set laststatus=2
+
+set textwidth=80
 
 let g:lightline = {
   \ 'colorscheme': 'nord',
@@ -107,6 +115,9 @@ colorscheme kalahari
 highlight Cursor guifg=white guibg=black
 highlight iCursor guifg=white guibg=steelblue
 
+nnoremap <silent> <Space> :nohlsearch<Bar>:echo<CR>
+nnoremap <F2> :w<CR>
+
 " Rainbow parentheses - show pairs of matching parentheses in different colors
 " " A guard against the case when the plugin has not yet been installed
 if isdirectory(expand('~/.vim/bundle/rainbow_parentheses.vim'))
@@ -123,6 +134,3 @@ if isdirectory(expand('~/.vim/bundle/rainbow_parentheses.vim'))
         \ ['darkmagenta', 'DarkOrchid3'],
         \ ]
 endif
-
-
-
