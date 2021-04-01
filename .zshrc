@@ -70,4 +70,10 @@ set editing-mode vi
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+#
+autoload bashcompinit
+bashcompinit
 
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+export FZF_DEFAULT_OPTS='--height 10 --reverse --border'
