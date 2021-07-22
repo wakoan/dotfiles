@@ -117,6 +117,8 @@ let g:netrw_browse_split = 3
 " 25% of the page for netrw
 let g:netrw_winsize = 25
 
+" Enable mouse scroll wheel
+set mouse=a
 
 filetype plugin indent on
 
