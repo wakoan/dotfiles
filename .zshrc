@@ -41,6 +41,7 @@ plugins=(git tmux sublime rust pip osx history themes)
 source $ZSH/oh-my-zsh.sh
 
 set editing-mode vi
+alias far=/Users/wako/projects/far2l/build/install/far2l.app/Contents/MacOS/far2l
 
 # User configuration
 
