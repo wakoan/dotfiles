@@ -65,6 +65,13 @@ let g:slime_target = "tmux"
 let g:slime_paste_file = "$HOME/.slime_paste"
 let g:slime_python_ipython = 1
 
+xmap <c-c><c-c> <Plug>SlimeRegionSend
+nmap <c-c><c-c> <Plug>SlimeParagraphSend
+
+xmap <F9> <Plug>SlimeRegionSend
+nmap <F9> <Plug>SlimeParagraphSend
+
+
 " tmux navigator configuration
 let g:tmux_navigator_no_mappings = 1
 
@@ -177,6 +184,9 @@ inoremap <F2> <ESC>:w<CR>i
 " Open file navigator
 inoremap <F3> <ESC>:Vexplore<CR>
 nnoremap <F3> :Vexplore<CR>
+
+inoremap <F10> <ESC>:q<CR>
+nnoremap <F10> :q<CR>
 
 " Highlight the word
 nnoremap <F8> :let @/='\<<C-R>=expand("<cword>")<CR>\>'<CR>:set hls<CR>
