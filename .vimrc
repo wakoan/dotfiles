@@ -57,6 +57,10 @@ Plugin 'junegunn/fzf.vim'
 
 Plugin 'jacquesbh/vim-showmarks'
 
+Plugin 'prabirshrestha/vim-lsp'
+Plugin 'prabirshrestha/asyncomplete.vim'
+Plugin 'prabirshrestha/asyncomplete-lsp.vim'
+
 
 call vundle#end()
 
@@ -324,3 +328,6 @@ nnoremap /[ :YcmCompleter GoTo<CR>
 nnoremap /] :YcmCompleter GoToDefinition<CR>
 nnoremap <leader>f :YcmCompleter FixIt<CR>
 
+" LSP config
+nnoremap gd   :LspDefinition<CR>  " gd in Normal mode triggers gotodefinition
+nnoremap <F4> :LspReferences<CR>  " F4 in Normal mode shows all references
