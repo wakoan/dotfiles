@@ -23,7 +23,6 @@ Plugin 'davidklsn/vim-sialoquent.git'
 
 " Status line customization
 Plugin 'itchyny/lightline.vim'
-Plugin 'arcticicestudio/nord-vim.git'
 
 " enable other plugins
 Plugin 'scrooloose/nerdtree'
@@ -51,8 +50,10 @@ Plugin 'kshenoy/vim-signature'
 Plugin 'danilo-augusto/vim-afterglow'
 Plugin 'fabi1cazenave/kalahari.vim.git'
 Plugin 'croaker/mustang-vim'
+Plugin 'joshdick/onedark.vim.git'
+Plugin 'kaicataldo/material.vim.git'
+Plugin 'arcticicestudio/nord-vim.git'
 
-" Plugin 'file://usr/local/google/home/vakunov/.fzf/plugin/fzf.vim'
 Plugin 'junegunn/fzf.vim'
 
 Plugin 'jacquesbh/vim-showmarks'
@@ -174,7 +175,8 @@ let g:lightline = {
   \ }
 
 " Enable color scheme
-colorscheme kalahari
+" kalahari onedark nord material
+colorscheme onedark
 
 " Highlight cursor
 highlight Cursor guifg=white guibg=black
@@ -188,8 +190,10 @@ nnoremap <F2> :w<CR>
 inoremap <F2> <ESC>:w<CR>i
 
 " Open file navigator
-inoremap <F3> <ESC>:Vexplore<CR>
-nnoremap <F3> :Vexplore<CR>
+inoremap <F3> <ESC>:NERDTree<CR>
+nnoremap <F3> :NERDTree<CR>
+" inoremap <F3> <ESC>:Vexplore<CR>
+" nnoremap <F3> :Vexplore<CR>
 
 inoremap <F10> <ESC>:q<CR>
 nnoremap <F10> :q<CR>
@@ -306,9 +310,6 @@ let g:SignatureMarkerTextHLDynamic=1
 
 " let g:SignatureMarkTextHL = Error
 highlight SignColumn guibg=blue
-
-" Enable color scheme
-colorscheme kalahari
 
 " Highlight cursor
 highlight Cursor guifg=white guibg=black
