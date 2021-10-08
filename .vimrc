@@ -155,7 +155,7 @@ set textwidth=80
 set colorcolumn=+1
 
 let g:lightline = {
-  \ 'colorscheme': 'nord',
+  \ 'colorscheme': 'onedark',
   \ 'active': {
   \   'left': [ [ 'mode', 'paste' ],
   \             [ 'fugitive', 'readonly', 'filename', 'modified' ] ]
@@ -198,9 +198,13 @@ nnoremap <F3> :NERDTree<CR>
 inoremap <F10> <ESC>:q<CR>
 nnoremap <F10> :q<CR>
 
+nnoremap <F12> <ESC>:Buffers<CR>
+
 " Highlight the word
 nnoremap <F8> :let @/='\<<C-R>=expand("<cword>")<CR>\>'<CR>:set hls<CR>
 
+" cnoremap <c-r> :History:<CR>
+cmap <c-r> :History:<CR>
 
 
 " Rainbow parentheses - show pairs of matching parentheses in different colors
@@ -332,3 +336,8 @@ nnoremap <leader>f :YcmCompleter FixIt<CR>
 " LSP config
 nnoremap gd   :LspDefinition<CR>  " gd in Normal mode triggers gotodefinition
 nnoremap <F4> :LspReferences<CR>  " F4 in Normal mode shows all references
+
+
+" FZF configuratio
+let g:fzf_preview_window = ['right:50%', 'ctrl-/']
+
