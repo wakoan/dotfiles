@@ -1,6 +1,6 @@
 set nocompatible
 set ruler
-set number
+set relativenumber
 set hlsearch
 
 set showcmd       " display incomplete commands
@@ -53,6 +53,7 @@ Plugin 'croaker/mustang-vim'
 Plugin 'joshdick/onedark.vim.git'
 Plugin 'kaicataldo/material.vim.git'
 Plugin 'arcticicestudio/nord-vim.git'
+Plugin 'vim-python/python-syntax'
 
 Plugin 'junegunn/fzf.vim'
 
@@ -132,7 +133,10 @@ set shiftwidth=2
 set expandtab
 set smarttab
 
+" Python
 autocmd Filetype python setlocal expandtab tabstop=2 shiftwidth=2
+let g:python_highlight_all = 1
+
 
 syntax on
 
@@ -140,7 +144,7 @@ set encoding=utf-8
 language en_US.UTF-8
 
 set listchars=eol:$,tab:——,trail:~,extends:>,precedes:<,space:⋅
-" set list
+set list
 
 set ttyfast
 set nowrap
@@ -325,13 +329,13 @@ let g:showmarks_marks='abcdefghijklmnopqrstuvwxyz' .'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 set updatetime=250
 
 " YCM config
-let g:ycm_autoclose_preview_window_after_insertion = 1
-let g:ycm_key_list_select_completion = ['<TAB>', '<Down>', '<Enter>']
-let g:ycm_enable_diagnostic_highlighting = 0
+" let g:ycm_autoclose_preview_window_after_insertion = 1
+" let g:ycm_key_list_select_completion = ['<TAB>', '<Down>', '<Enter>']
+" let g:ycm_enable_diagnostic_highlighting = 0
 
-nnoremap /[ :YcmCompleter GoTo<CR>
-nnoremap /] :YcmCompleter GoToDefinition<CR>
-nnoremap <leader>f :YcmCompleter FixIt<CR>
+" nnoremap /[ :YcmCompleter GoTo<CR>
+" nnoremap /] :YcmCompleter GoToDefinition<CR>
+" nnoremap <leader>f :YcmCompleter FixIt<CR>
 
 " LSP config
 nnoremap gd   :LspDefinition<CR>  " gd in Normal mode triggers gotodefinition
