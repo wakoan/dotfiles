@@ -1,6 +1,7 @@
 set nocompatible
 set ruler
 set relativenumber
+set number
 set hlsearch
 
 set showcmd       " display incomplete commands
@@ -18,9 +19,6 @@ call vundle#begin()
 " enable Vundle
 Plugin 'gmarik/Vundle.vim'
 
-" Color schemas
-Plugin 'davidklsn/vim-sialoquent.git'
-
 " Status line customization
 Plugin 'itchyny/lightline.vim'
 
@@ -30,10 +28,10 @@ Plugin 'christoomey/vim-tmux-navigator'
 
 " Color parentheses in the right way
 Plugin 'kien/rainbow_parentheses.vim'
-Plugin 'terryma/vim-multiple-cursors'
+" Plugin 'terryma/vim-multiple-cursors'
 
-Plugin 'kien/ctrlp.vim'
-Plugin 'scrooloose/syntastic'
+" Plugin 'kien/ctrlp.vim'
+Plugin 'vim-syntastic/syntastic'
 Plugin 'xaizek/vim-inccomplete'
 
 " Languages support
@@ -45,7 +43,6 @@ Plugin 'jpalardy/vim-slime.git'
 
 Plugin 'kshenoy/vim-signature'
 
-
 " Color schemes
 Plugin 'danilo-augusto/vim-afterglow'
 Plugin 'fabi1cazenave/kalahari.vim.git'
@@ -53,16 +50,26 @@ Plugin 'croaker/mustang-vim'
 Plugin 'joshdick/onedark.vim.git'
 Plugin 'kaicataldo/material.vim.git'
 Plugin 'arcticicestudio/nord-vim.git'
+Plugin 'davidklsn/vim-sialoquent.git'
+Plugin 'altercation/vim-colors-solarized.git'
+
+" Other
 Plugin 'vim-python/python-syntax'
 
 Plugin 'junegunn/fzf.vim'
 
-Plugin 'jacquesbh/vim-showmarks'
+" Plugin 'jacquesbh/vim-showmarks'
 
 Plugin 'prabirshrestha/vim-lsp'
 Plugin 'prabirshrestha/asyncomplete.vim'
 Plugin 'prabirshrestha/asyncomplete-lsp.vim'
 
+Plugin 'dense-analysis/ale'
+
+Plugin 'nvim-lua/plenary.nvim'
+Plugin 'nvim-telescope/telescope.nvim'
+
+Plugin 'ryanoasis/vim-devicons'
 
 call vundle#end()
 
@@ -103,6 +110,15 @@ nnoremap <Right> :echoe "Use l"<CR>
 nnoremap <Up> :echoe "Use k"<CR>
 nnoremap <Down> :echoe "Use j"<CR>
 
+" simplify command entry
+" nnoremap ; :
+" vnoremap ; :
+" nnoremap : ;
+" vnoremap : ;
+
+inoremap <expr> j ((pumvisible())?("\<C-n>"):("j"))
+inoremap <expr> k ((pumvisible())?("\<C-p>"):("k"))
+
 " Use enchanced navigation
 cnoremap <C-a>  <Home>
 " cnoremap <C-b>  <Left>
@@ -137,14 +153,13 @@ set smarttab
 autocmd Filetype python setlocal expandtab tabstop=2 shiftwidth=2
 let g:python_highlight_all = 1
 
-
 syntax on
 
-set encoding=utf-8
+set encoding=utf8
 language en_US.UTF-8
 
-set listchars=eol:$,tab:——,trail:~,extends:>,precedes:<,space:⋅
 set list
+set listchars=eol:$,tab:——,trail:~,extends:>,precedes:<,space:⋅
 
 set ttyfast
 set nowrap
@@ -323,7 +338,8 @@ highlight SignColumn guibg=blue
 highlight Cursor guifg=white guibg=black
 highlight iCursor guifg=white guibg=steelblue
 
-let g:showmarks_marks='abcdefghijklmnopqrstuvwxyz' .'ABCDEFGHIJKLMNOPQRSTUVWXYZ' .'<>' .'0123456789(){}''^."`'
+" let g:showmarks_marks='abcdefghijklmnopqrstuvwxyz' .'ABCDEFGHIJKLMNOPQRSTUVWXYZ' .'<>' .'0123456789(){}''^."`'
+" let g:showmarks_marks='abcdefghijklmnopqrstuvwxyz' .'ABCDEFGHIJKLMNOPQRSTUVWXYZ' .'0123456789(){}''^."`'
 
 " Update marks every ms
 set updatetime=250
