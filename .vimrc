@@ -11,6 +11,8 @@ set autowrite     " Automatically :write before running commands
 
 filetype off
 
+let mapleader = "," " map leader to comma
+
 set rtp+=~/.vim/bundle/Vundle.vim
 set rtp+=~/.fzf
 
@@ -64,14 +66,46 @@ Plugin 'prabirshrestha/vim-lsp'
 Plugin 'prabirshrestha/asyncomplete.vim'
 Plugin 'prabirshrestha/asyncomplete-lsp.vim'
 
+" Plugin 'neovim/nvim-lspconfig'
+
+
 Plugin 'dense-analysis/ale'
 
 Plugin 'nvim-lua/plenary.nvim'
 Plugin 'nvim-telescope/telescope.nvim'
+Plugin 'nvim-treesitter/nvim-treesitter'
 
-Plugin 'ryanoasis/vim-devicons'
+Plugin 'phaazon/hop.nvim'
+
+" Plugin 'ryanoasis/vim-devicons'
+"
+"" CiderLSP
+Plugin 'hrsh7th/cmp-buffer'
+Plugin 'hrsh7th/cmp-nvim-lsp'
+Plugin 'hrsh7th/cmp-nvim-lua'
+Plugin 'hrsh7th/cmp-path'
+Plugin 'hrsh7th/cmp-vsnip'
+Plugin 'hrsh7th/nvim-cmp'
+Plugin 'hrsh7th/vim-vsnip'
+Plugin 'neovim/nvim-lspconfig'
+Plugin 'onsails/lspkind.nvim'
+
+" Diagnostics
+Plugin 'kyazdani42/nvim-web-devicons'
+Plugin 'folke/trouble.nvim'
 
 call vundle#end()
+
+" Require CiderLSP and Diagnostics modules
+" IMPORTANT: Must come after plugins are loaded
+lua << EOF
+  -- CiderLSP
+  vim.opt.completeopt = { "menu", "menuone", "noselect" }
+  -- require("lsp")
+
+  -- Diagnostics
+  -- require("diagnostics")
+EOF
 
 " slime configuration
 let g:slime_target = "tmux"
@@ -103,6 +137,15 @@ nnoremap <c-j> <c-w>j
 nnoremap <c-k> <c-w>k
 nnoremap <c-h> <c-w>h
 nnoremap <c-l> <c-w>l
+
+" remap navigation with alt
+nnoremap <M-j> <c-w>j
+nnoremap <M-k> <c-w>k
+nnoremap <M-h> <c-w>h
+nnoremap <M-l> <c-w>l
+
+" Go to previous window
+noremap <Tab> <C-w><C-p>
 
 " Get off my lawn
 nnoremap <Left> :echoe "Use h"<CR>
@@ -140,7 +183,7 @@ let g:netrw_browse_split = 3
 let g:netrw_winsize = 25
 
 " Enable mouse scroll wheel
-set mouse=a
+" set mouse=a
 
 filetype plugin indent on
 
@@ -209,21 +252,24 @@ nnoremap <F2> :w<CR>
 inoremap <F2> <ESC>:w<CR>i
 
 " Open file navigator
-inoremap <F3> <ESC>:NERDTree<CR>
-nnoremap <F3> :NERDTree<CR>
+inoremap <F3> <ESC>:NERDTreeFind<CR>
+nnoremap <F3> :NERDTreeFind<CR>
 " inoremap <F3> <ESC>:Vexplore<CR>
 " nnoremap <F3> :Vexplore<CR>
 
 inoremap <F10> <ESC>:q<CR>
 nnoremap <F10> :q<CR>
 
-nnoremap <F12> <ESC>:Buffers<CR>
+" nnoremap <F12> <ESC>:Buffers<CR>
+" nnoremap <F12> <ESC>:Telescope buffers layout_strategy=center layout_config.width=0.9 picker.layout_config.height=0.5<CR>
+nnoremap <F12> <ESC>:lua require'telescope.builtin'.buffers(require('telescope.themes').get_dropdown({ layout_config = {width = 0.9} }))<CR>
 
 " Highlight the word
 nnoremap <F8> :let @/='\<<C-R>=expand("<cword>")<CR>\>'<CR>:set hls<CR>
 
 " cnoremap <c-r> :History:<CR>
-cmap <c-r> :History:<CR>
+" cmap <c-r> :History:<CR>
+cmap <c-r> :Telescope command_history<CR>
 
 
 " Rainbow parentheses - show pairs of matching parentheses in different colors
@@ -361,3 +407,8 @@ nnoremap <F4> :LspReferences<CR>  " F4 in Normal mode shows all references
 " FZF configuratio
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 
+" Initialize HOP hightlights
+lua require'hop.highlight'.insert_highlights()
+
+nnoremap <leader>j :HopWord<CR>
+vnoremap <leader>j :HopWord<CR>
