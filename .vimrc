@@ -47,13 +47,16 @@ Plugin 'kshenoy/vim-signature'
 
 " Color schemes
 Plugin 'danilo-augusto/vim-afterglow'
-Plugin 'fabi1cazenave/kalahari.vim.git'
+" Plugin 'fabi1cazenave/kalahari.vim.git'
 Plugin 'croaker/mustang-vim'
 Plugin 'joshdick/onedark.vim.git'
 Plugin 'kaicataldo/material.vim.git'
 Plugin 'arcticicestudio/nord-vim.git'
 Plugin 'davidklsn/vim-sialoquent.git'
 Plugin 'altercation/vim-colors-solarized.git'
+" Plugin 'sonph/onehalf'
+Plugin 'cocopon/iceberg.vim'
+Plugin 'NLKNguyen/papercolor-theme'
 
 " Other
 Plugin 'vim-python/python-syntax'
@@ -68,11 +71,16 @@ Plugin 'prabirshrestha/asyncomplete-lsp.vim'
 
 " Plugin 'neovim/nvim-lspconfig'
 
+" Visualize changes in editor
+Plugin 'mhinz/vim-signify'
+
 
 Plugin 'dense-analysis/ale'
 
 Plugin 'nvim-lua/plenary.nvim'
 Plugin 'nvim-telescope/telescope.nvim'
+Plugin 'nvim-telescope/telescope-file-browser.nvim'
+
 Plugin 'nvim-treesitter/nvim-treesitter'
 
 Plugin 'phaazon/hop.nvim'
@@ -94,7 +102,25 @@ Plugin 'onsails/lspkind.nvim'
 Plugin 'kyazdani42/nvim-web-devicons'
 Plugin 'folke/trouble.nvim'
 
+" Try another file manager
+" Plugin 'nvim-tree/nvim-web-devicons' " optional, for file icons
+Plugin 'nvim-tree/nvim-tree.lua'
+
+
+Plugin 'ipod825/libp.nvim'
+" Plugin 'sso://user/smwang/hg.nvim'
+Plugin 'smithbm2316/centerpad.nvim'
+
 call vundle#end()
+
+Bundle 'sonph/onehalf', {'rtp': 'vim/'}
+
+if exists('+termguicolors')
+  let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+  let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+  " TODO(vakunov): enable it
+  set termguicolors
+endif
 
 " Require CiderLSP and Diagnostics modules
 " IMPORTANT: Must come after plugins are loaded
@@ -145,7 +171,7 @@ nnoremap <M-h> <c-w>h
 nnoremap <M-l> <c-w>l
 
 " Go to previous window
-noremap <Tab> <C-w><C-p>
+noremap <Tab> <C-w><C-w>
 
 " Get off my lawn
 nnoremap <Left> :echoe "Use h"<CR>
@@ -159,8 +185,8 @@ nnoremap <Down> :echoe "Use j"<CR>
 " nnoremap : ;
 " vnoremap : ;
 
-inoremap <expr> j ((pumvisible())?("\<C-n>"):("j"))
-inoremap <expr> k ((pumvisible())?("\<C-p>"):("k"))
+" inoremap <expr> j ((pumvisible())?("\<C-n>"):("j"))
+" inoremap <expr> k ((pumvisible())?("\<C-p>"):("k"))
 
 " Use enchanced navigation
 cnoremap <C-a>  <Home>
@@ -217,7 +243,7 @@ set textwidth=80
 set colorcolumn=+1
 
 let g:lightline = {
-  \ 'colorscheme': 'onedark',
+  \ 'colorscheme': 'iceberg',
   \ 'active': {
   \   'left': [ [ 'mode', 'paste' ],
   \             [ 'fugitive', 'readonly', 'filename', 'modified' ] ]
@@ -238,22 +264,29 @@ let g:lightline = {
 
 " Enable color scheme
 " kalahari onedark nord material
-colorscheme onedark
+" colorscheme onedark
+" colorscheme onehalfdark
+" colorscheme onedark
+" colorscheme iceberg
+colorscheme material
 
 " Highlight cursor
 highlight Cursor guifg=white guibg=black
 highlight iCursor guifg=white guibg=steelblue
 
 " Press Space to turn off highlighting and clear any message already displayed.
-nnoremap <silent> <Space> :nohlsearch<Bar>:echo<CR>
+nnoremap <silent> <Space> :nohlsearch<Bar>:echo<CR>:HopWord<CR>
 
 " Use F2 for save file
 nnoremap <F2> :w<CR>
-inoremap <F2> <ESC>:w<CR>i
+inoremap <F2> <ESC>:w<CR>
 
 " Open file navigator
 inoremap <F3> <ESC>:NERDTreeFind<CR>
 nnoremap <F3> :NERDTreeFind<CR>
+
+" inoremap <F3> <ESC>:Telescope find_files<CR>
+" nnoremap <F3> :Telescope find_files<CR>
 " inoremap <F3> <ESC>:Vexplore<CR>
 " nnoremap <F3> :Vexplore<CR>
 
@@ -378,7 +411,7 @@ let g:SignatureMarkTextHLDynamic=1
 let g:SignatureMarkerTextHLDynamic=1
 
 " let g:SignatureMarkTextHL = Error
-highlight SignColumn guibg=blue
+" highlight SignColumn guibg=blue
 
 " Highlight cursor
 highlight Cursor guifg=white guibg=black
@@ -388,7 +421,7 @@ highlight iCursor guifg=white guibg=steelblue
 " let g:showmarks_marks='abcdefghijklmnopqrstuvwxyz' .'ABCDEFGHIJKLMNOPQRSTUVWXYZ' .'0123456789(){}''^."`'
 
 " Update marks every ms
-set updatetime=250
+set updatetime=100
 
 " YCM config
 " let g:ycm_autoclose_preview_window_after_insertion = 1
@@ -408,7 +441,16 @@ nnoremap <F4> :LspReferences<CR>  " F4 in Normal mode shows all references
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 
 " Initialize HOP hightlights
+lua require'hop'.setup()
+
 lua require'hop.highlight'.insert_highlights()
 
 nnoremap <leader>j :HopWord<CR>
 vnoremap <leader>j :HopWord<CR>
+
+set background=light
+
+let g:signify_line_highlight = 0
+
+lua require("telescope").load_extension "file_browser"
+
