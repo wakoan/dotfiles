@@ -1,0 +1,5 @@
+@import ".config/wofi/style.css";
+window {
+	font-family: "InputMono Nerd Font", "Symbols Nerd Font", monospace;
+	font-size: 13px;
+}

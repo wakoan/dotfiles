@@ -1,0 +1,93 @@
+/* Catppuccin Mocha — light visual weight: translucent, compact, minimal chrome */
+
+window {
+    margin: 0px;
+    border: 1px solid rgba(203, 166, 247, 0.35);
+    background-color: rgba(30, 30, 46, 0.75);
+    border-radius: 12px;
+    font-family: "InputMono Nerd Font", "Symbols Nerd Font", monospace;
+    font-size: 13px;
+    color: #cdd6f4;
+}
+
+#input {
+    margin: 6px 8px 2px 8px;
+    padding: 5px 10px;
+    border: none;
+    border-bottom: 1px solid rgba(69, 71, 90, 0.8);
+    border-radius: 0px;
+    color: #cdd6f4;
+    background-color: transparent;
+    outline: none;
+    box-shadow: none;
+}
+
+#input:focus {
+    border: none;
+    border-bottom: 1px solid rgba(203, 166, 247, 0.7);
+    outline: none;
+    box-shadow: none;
+}
+
+#input image {
+    color: #6c7086;
+}
+
+#outer-box {
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    border-radius: 12px;
+    background-color: transparent;
+}
+
+#inner-box {
+    margin: 2px 4px 4px 4px;
+    border: none;
+    background-color: transparent;
+    color: #cdd6f4;
+}
+
+#scroll {
+    margin: 0px;
+    border: none;
+}
+
+#entry {
+    margin: 0px 2px;
+    padding: 3px 8px;
+    border: none;
+    border-radius: 6px;
+    background-color: transparent;
+    outline: none;
+}
+
+#entry:selected,
+#entry:focus,
+#entry:selected:focus {
+    background-color: rgba(203, 166, 247, 0.85);
+    color: #11111b;
+    outline: none;
+    box-shadow: none;
+    border: none;
+    /* kill GTK's dotted focus ring */
+    -gtk-outline-radius: 0;
+}
+
+#text {
+    color: #cdd6f4;
+    margin: 0px 6px;
+}
+
+#text:selected {
+    color: #11111b;
+    font-weight: bold;
+}
+
+#unselected {
+    color: #cdd6f4;
+}
+
+#selected {
+    color: #11111b;
+}

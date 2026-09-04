@@ -1,0 +1,36 @@
+# Catppuccin Mocha — matches waybar / Hyprland borders
+
+font=InputMono Nerd Font 11
+background-color=#1e1e2e
+text-color=#cdd6f4
+border-color=#cba6f7
+progress-color=over #313244
+
+width=360
+height=140
+margin=12
+padding=14
+border-size=2
+border-radius=12
+icon-path=/usr/share/icons/Adwaita
+max-icon-size=48
+
+anchor=top-right
+layer=overlay
+default-timeout=5000
+ignore-timeout=0
+max-visible=5
+
+format=<b>%s</b>\n%b
+
+[urgency=low]
+border-color=#585b70
+default-timeout=3000
+
+[urgency=normal]
+border-color=#cba6f7
+
+[urgency=critical]
+border-color=#f38ba8
+text-color=#f38ba8
+default-timeout=0
