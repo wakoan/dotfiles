@@ -17,14 +17,20 @@ MODS = {
     73: "SUPER SHIFT ALT", 76: "SUPER CTRL ALT", 77: "SUPER SHIFT CTRL ALT",
 }
 
-# Apple keyboard sends these on Fn+F-key
+# Whether the media keys or the F-keys need Fn depends on the hid_apple fnmode
+# (1 = media keys are primary, 2 = F-keys are primary), so read it live.
+try:
+    FN = "" if open("/sys/module/hid_apple/parameters/fnmode").read().strip() == "1" else "Fn+"
+except OSError:
+    FN = "Fn+"
+
 FKEY = {
-    "XF86AudioMute": "Fn+F10", "XF86AudioLowerVolume": "Fn+F11",
-    "XF86AudioRaiseVolume": "Fn+F12", "XF86AudioPrev": "Fn+F7",
-    "XF86AudioPlay": "Fn+F8", "XF86AudioNext": "Fn+F9",
-    "XF86MonBrightnessDown": "Fn+F1", "XF86MonBrightnessUp": "Fn+F2",
-    "XF86KbdBrightnessDown": "Fn+F5", "XF86KbdBrightnessUp": "Fn+F6",
-    "XF86AudioMicMute": "Fn+F4",
+    "XF86AudioMute": FN + "F10", "XF86AudioLowerVolume": FN + "F11",
+    "XF86AudioRaiseVolume": FN + "F12", "XF86AudioPrev": FN + "F7",
+    "XF86AudioPlay": FN + "F8", "XF86AudioNext": FN + "F9",
+    "XF86MonBrightnessDown": FN + "F1", "XF86MonBrightnessUp": FN + "F2",
+    "XF86KbdBrightnessDown": FN + "F5", "XF86KbdBrightnessUp": FN + "F6",
+    "XF86AudioMicMute": FN + "F4",
 }
 
 rows = []
