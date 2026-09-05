@@ -36,6 +36,11 @@ cursor-opacity = 1
 cursor-style = block
 cursor-style-blink = true
 shell-integration-features = no-cursor
+
+# Fix general slowness on Hyprland
+# https://github.com/ghostty-org/ghostty/discussions/3224
+async-backend = epoll
+
 # window-padding-x = 2
 #
 # # Spacing around the equals sign does not matter.
