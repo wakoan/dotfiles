@@ -2,7 +2,7 @@
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH=/Users/wako/.oh-my-zsh
+export ZSH=/home/wako/.oh-my-zsh
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
@@ -36,7 +36,7 @@ HIST_STAMPS="yyyy-mm-dd"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git tmux sublime rust pip osx history themes)
+plugins=(git tmux sublime rust pip history themes) # osx 
 
 source $ZSH/oh-my-zsh.sh
 
@@ -76,5 +76,13 @@ autoload bashcompinit
 bashcompinit
 
 
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+# fzf shell integration (Ctrl+R history, Ctrl+T files, Alt+C cd).
+# Arch ships these under /usr/share/fzf; fzf's own installer writes ~/.fzf.zsh.
+if [ -d /usr/share/fzf ]; then
+  source /usr/share/fzf/key-bindings.zsh
+  source /usr/share/fzf/completion.zsh
+elif [ -f ~/.fzf.zsh ]; then
+  source ~/.fzf.zsh
+fi
 export FZF_DEFAULT_OPTS='--height 10 --reverse --border'
+export PATH="$HOME/.local/bin:$PATH"
