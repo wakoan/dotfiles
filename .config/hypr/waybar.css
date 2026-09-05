@@ -41,6 +41,7 @@ window#waybar {
 #workspaces button,
 #temperature,
 #network,
+#bluetooth,
 #pulseaudio,
 #battery,
 #cpu,
@@ -72,6 +73,9 @@ window#waybar {
 /* Right-side accents */
 #clock       { color: @blue; }
 #pulseaudio  { color: @yellow; }
+#bluetooth   { color: @subtext; }
+#bluetooth.connected { color: @blue; }
+#bluetooth.off, #bluetooth.disabled { color: @surface1; }
 #pulseaudio.muted     { color: @surface1; }
 #pulseaudio.bluetooth { color: @blue; }
 #cpu         { color: @teal; }
