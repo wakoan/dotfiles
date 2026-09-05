@@ -1,4 +1,4 @@
 # Wallpaper images and the abandoned old/ setup are kept out of git
 .config/hypr/wallpapers/
 .config/hypr/old/
-.config/hypr/.wallpaper
+.config/hypr/current-wallpaper

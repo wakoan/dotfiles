@@ -1,29 +1,27 @@
 #!/bin/sh
-# Start hyprpaper and apply the wallpaper via IPC.
-# (config-file `preload`/`wallpaper` directives are not honoured by the
-#  installed hyprpaper build, so we set it over IPC once the socket is up.)
+# Point ~/.config/hypr/current-wallpaper at an image and (re)start swaybg on it.
+#
+# The symlink is the persistent state: swaybg is always launched against the
+# link, never the real file, so the choice survives a relogin with no state
+# file to keep in sync.
+#
+# usage: wallpaper.sh [/path/to/image]      (no arg = re-apply current)
 
-STATE="$HOME/.config/hypr/.wallpaper"
+LINK="$HOME/.config/hypr/current-wallpaper"
 DEFAULT="$HOME/.config/hypr/wallpapers/1.jpg"
 
 if [ -n "$1" ]; then
-    WALLPAPER="$1"
-elif [ -f "$STATE" ] && [ -f "$(cat "$STATE")" ]; then
-    WALLPAPER=$(cat "$STATE")
+    WALLPAPER=$1
+elif [ -L "$LINK" ]; then
+    WALLPAPER=$(readlink "$LINK")
 else
-    WALLPAPER="$DEFAULT"
+    WALLPAPER=$DEFAULT
 fi
 
-pkill -x hyprpaper 2>/dev/null
-hyprpaper >/dev/null 2>&1 &
+# Fall back if the remembered image was deleted or renamed.
+[ -f "$WALLPAPER" ] || WALLPAPER=$DEFAULT
 
-# wait for the hyprpaper IPC socket
-i=0
-while [ "$i" -lt 50 ]; do
-    hyprctl hyprpaper listactive >/dev/null 2>&1 && break
-    i=$((i + 1))
-    sleep 0.1
-done
+ln -sfn "$WALLPAPER" "$LINK"
 
-hyprctl hyprpaper wallpaper ",$WALLPAPER"
-printf '%s\n' "$WALLPAPER" > "$STATE"
+pkill -x swaybg 2>/dev/null
+setsid swaybg -i "$LINK" -m fill >/dev/null 2>&1 &
