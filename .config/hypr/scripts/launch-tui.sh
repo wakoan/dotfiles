@@ -8,6 +8,14 @@
 # usage: launch-tui.sh <command> [args...]
 
 [ -z "$1" ] && exit 1
+
+# Without this a missing TUI is a silent no-op: the terminal opens, the
+# command is not found, and the window closes before anything is readable.
+if ! command -v "$1" >/dev/null 2>&1; then
+    notify-send -u critical "$1 is not installed" "Install it with: sudo pacman -S $1"
+    exit 1
+fi
+
 CLASS="org.wako.$(basename "$1")"
 
 ADDR=$(hyprctl clients -j \
