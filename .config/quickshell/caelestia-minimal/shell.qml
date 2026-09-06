@@ -957,7 +957,10 @@ ShellRoot {
                     // Soramane opens one surface from above the screen and lets it
                     // settle in the middle. Keep the bar visible and use the same
                     // vertical reveal for the network surface.
-                    implicitWidth: Math.min(720, barWindow.width - 48)
+                    // The flares are drawn outside the sheet, so the window
+                    // has to be wider than the sheet by one radius per side.
+                    property int flare: 22
+                    implicitWidth: Math.min(720, barWindow.width - 48) + flare * 2
                     implicitHeight: 690
                     id: wifiPopup
                     property real revealY: -implicitHeight
@@ -982,20 +985,116 @@ ShellRoot {
                             // The anchor's gravity is Bottom|Right, so its x
                             // coordinate is the sheet's right edge.
                             wifiAnchor.rect.x = Math.round(barWindow.width / 2 + wifiPopup.implicitWidth / 2)
-                            wifiAnchor.rect.y = Math.round(barWindow.height + 10)
+                            wifiAnchor.rect.y = barWindow.height
                         }
                     }
                     Rectangle {
                         id: wifiSurface
-                        x: 0
+                        x: wifiPopup.flare
                         y: wifiPopup.revealY
-                        width: parent.width
+                        width: parent.width - wifiPopup.flare * 2
                         height: parent.height
-                        radius: 24
-                        color: "#20232f"
+                        // Same colour as the bar (#171923), so the sheet reads
+                        // as an extension of it rather than a separate surface.
+                        // Square where it meets the bar so the flares continue
+                        // that edge into the sheet; rounded at the bottom.
+                        // Per-corner radii need Qt 6.7+; this runs on 6.11.
+                        topLeftRadius: 0
+                        topRightRadius: 0
+                        bottomLeftRadius: 26
+                        bottomRightRadius: 26
+                        color: "#171923"
                         border.width: 1
                         border.color: "#53586d"
                         Behavior on y { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
+                        // Rectangle draws its border on all four sides, but
+                        // the top edge butts against the bar and the top
+                        // `flare` pixels of each side butt against an inverse
+                        // corner. Both runs read as a seam, so paint over them
+                        // in sheet colour; children draw above the parent's
+                        // own border.
+                        Rectangle {
+                            x: 0; y: 0
+                            width: parent.width; height: 2
+                            color: "#171923"
+                        }
+                        Rectangle {
+                            x: 0; y: 0
+                            width: 2; height: wifiPopup.flare
+                            color: "#171923"
+                        }
+                        Rectangle {
+                            x: parent.width - 2; y: 0
+                            width: 2; height: wifiPopup.flare
+                            color: "#171923"
+                        }
+
+                        // The sheet starts at y = -690 and slides in, so a
+                        // paint requested when the popup becomes visible is
+                        // dropped: the flares are still far off-window. Repaint
+                        // as it travels; each flare is 22x22, so it is cheap.
+                        onYChanged: {
+                            wifiFlareLeft.requestPaint()
+                            wifiFlareRight.requestPaint()
+                        }
+
+                        // Inverse corners. Each is a square of sheet colour with
+                        // a quarter disc cut out of it, centred on the square's
+                        // bottom outer corner: full width where it meets the bar,
+                        // tapering to nothing one radius further down. They are
+                        // children of the sheet, so they ride the reveal
+                        // animation, and they sit outside its bounds, which QML
+                        // renders because the sheet does not clip.
+                        Canvas {
+                            id: wifiFlareLeft
+                            width: wifiPopup.flare; height: wifiPopup.flare
+                            x: -width
+                            y: 0
+                            Component.onCompleted: requestPaint()
+                            onPaint: {
+                                var r = width
+                                var ctx = getContext("2d")
+                                ctx.reset()
+                                ctx.beginPath()
+                                ctx.moveTo(0, 0)
+                                ctx.lineTo(r, 0)
+                                ctx.lineTo(r, r)
+                                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
+                                ctx.closePath()
+                                ctx.fillStyle = "#171923"
+                                ctx.fill()
+                                ctx.beginPath()
+                                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
+                                ctx.strokeStyle = "#53586d"
+                                ctx.lineWidth = 1
+                                ctx.stroke()
+                            }
+                        }
+                        Canvas {
+                            id: wifiFlareRight
+                            width: wifiPopup.flare; height: wifiPopup.flare
+                            x: parent.width
+                            y: 0
+                            Component.onCompleted: requestPaint()
+                            onPaint: {
+                                var r = width
+                                var ctx = getContext("2d")
+                                ctx.reset()
+                                ctx.beginPath()
+                                ctx.moveTo(r, 0)
+                                ctx.lineTo(0, 0)
+                                ctx.lineTo(0, r)
+                                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
+                                ctx.closePath()
+                                ctx.fillStyle = "#171923"
+                                ctx.fill()
+                                ctx.beginPath()
+                                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
+                                ctx.strokeStyle = "#53586d"
+                                ctx.lineWidth = 1
+                                ctx.stroke()
+                            }
+                        }
                         Column {
                             anchors.fill: parent
                             anchors.margins: 12
