@@ -41,7 +41,8 @@ plugins=(git tmux sublime rust pip history themes) # osx
 source $ZSH/oh-my-zsh.sh
 
 set editing-mode vi
-alias far=/Users/wako/projects/far2l/build/install/far2l.app/Contents/MacOS/far2l
+# alias far=/Users/wako/projects/far2l/build/install/far2l.app/Contents/MacOS/far2l
+alias far='far2l --tty'
 
 # User configuration
 
@@ -86,3 +87,12 @@ elif [ -f ~/.fzf.zsh ]; then
 fi
 export FZF_DEFAULT_OPTS='--height 10 --reverse --border'
 export PATH="$HOME/.local/bin:$PATH"
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/wako/.local/bin:$PATH"
+
+# Display system info greeting on interactive terminal startup
+if [[ -o interactive ]] && [[ -t 1 ]] && command -v fastfetch >/dev/null 2>&1; then
+    fastfetch
+fi
