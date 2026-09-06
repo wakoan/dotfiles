@@ -15,26 +15,39 @@ set -u
 
 TMUX_BIN=/usr/bin/tmux
 MENU=(wofi --dmenu -i --prompt "Go to" --width 950 --height 560
+      --allow-images --define image_size=28
+      # dmenu mode reorders by usage frequency, which overrides the deliberate
+      # running-things-first ordering below; /dev/null disables that cache.
+      --cache-file /dev/null
       --style "$HOME/.config/wofi/switcher.css")
 
-# Nerd Font glyphs, written as escapes so the codepoints survive editing.
-WIN_ICON=$'\U000f05af'       # nf-md-window_maximize
-WIN_TMUX_ICON=$'\U000f018d'  # nf-md-console
-APP_ICON=$'\U000f003b'       # nf-md-apps
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+ICON_RESOLVER="$SCRIPT_DIR/switcher-icons.py"
+TMUX_ICON_SRC="$HOME/.config/hypr/icons/tmux.svg"
 
 declare -A ACTION
 declare -a LINES
 
-add() { # add <label> <action>
-    local label=$1 n=2
-    # Two entries can share a label, and the menu is keyed by its visible
-    # text, so make collisions unique rather than letting one shadow another.
-    while [[ -n ${ACTION[$label]:-} ]]; do
-        label="$1 ($n)"
+# wofi renders "img:<path>:text:<label>" as an icon beside the text when
+# --allow-images is on, and returns the whole escaped string on selection
+# (parse_action defaults to false), so the raw entry is a usable lookup key.
+add() { # add <icon-path> <label> <action>
+    local entry
+    if [[ -n $1 ]]; then
+        entry="img:$1:text:$2"
+    else
+        entry=$2
+    fi
+    local n=2 base=$entry
+    # Two entries can share a label; make collisions unique rather than
+    # letting one shadow another. The suffix lands on the text, which is
+    # last, so it cannot corrupt the image escape.
+    while [[ -n ${ACTION[$entry]:-} ]]; do
+        entry="$base ($n)"
         ((n++))
     done
-    ACTION[$label]=$2
-    LINES+=("$label")
+    ACTION[$entry]=$3
+    LINES+=("$entry")
 }
 
 HYPR_JSON=$(hyprctl clients -j)
@@ -57,6 +70,27 @@ window_for_tty() {
 
 # --- running things -------------------------------------------------------
 
+# One resolver call for every class on screen plus the app list; starting a
+# Python interpreter is ~200ms, so it must not happen per entry.
+mapfile -t WM_CLASSES < <(jq -r '.[].class' <<<"$HYPR_JSON" | sort -u)
+RESOLVER_ARGS=(--icon application-x-executable --file "$TMUX_ICON_SRC")
+for c in "${WM_CLASSES[@]}"; do
+    [[ -n $c ]] && RESOLVER_ARGS+=(--class "$c")
+done
+
+TMUX_ICON=""
+declare -A CLASS_ICON
+declare -a APP_ROWS
+FALLBACK_ICON=""
+while IFS=$'\t' read -r kind f1 f2 f3 f4; do
+    case $kind in
+    CLS) CLASS_ICON[$f1]=$f2 ;;
+    APP) APP_ROWS+=("$f1"$'\t'"$f2"$'\t'"$f3"$'\t'"$f4") ;;
+    ICON) FALLBACK_ICON=$f2 ;;
+    FILE) TMUX_ICON=$f2 ;;
+    esac
+done < <(python3 "$ICON_RESOLVER" "${RESOLVER_ARGS[@]}" 2>/dev/null)
+
 HOSTS=" "
 HAVE_TMUX=0
 if $TMUX_BIN has-session 2>/dev/null; then
@@ -71,63 +105,33 @@ fi
 
 while IFS=$'\t' read -r addr ws class title; do
     [[ $HOSTS == *" $addr "* ]] && continue
-    add "$WIN_ICON  ws$ws  ·  $class  ·  $title" "win:$addr"
+    icon=${CLASS_ICON[$class]:-}
+    [[ -z $icon ]] && icon=$FALLBACK_ICON
+    add "$icon" "$title  ·  $class  ·  ws$ws" "win:$addr"
 done < <(jq -r '.[] | [.address, (.workspace.name|tostring), .class, .title] | @tsv' <<<"$HYPR_JSON")
 
 if ((HAVE_TMUX)); then
     # Windows, not panes: a tmux window carries a name the user chose, which
     # identifies it far better than the pane titles the shell happens to set.
     while IFS=$'\t' read -r win label; do
-        add "$WIN_TMUX_ICON  $label" "tmux:$win"
+        add "$TMUX_ICON" "$label" "tmux:$win"
     done < <($TMUX_BIN list-windows -a -F $'#{window_id}\t#{session_name}:#{window_index}  ·  #{window_name}  ·  #{pane_current_command}')
 fi
 
 # --- installed apps -------------------------------------------------------
 
-# Directories in XDG precedence order; the first .desktop file for a given
-# basename wins, so a user override shadows the system copy.
-APP_DIRS=(
-    "$HOME/.local/share/applications"
-    /usr/local/share/applications
-    /usr/share/applications
-    "$HOME/.local/share/flatpak/exports/share/applications"
-    /var/lib/flatpak/exports/share/applications
-)
-
-mapfile -t DESKTOP_FILES < <(
-    for d in "${APP_DIRS[@]}"; do
-        [[ -d $d ]] && find "$d" -name '*.desktop' -type f 2>/dev/null | sort
-    done
-)
-
-if ((${#DESKTOP_FILES[@]})); then
-    declare -A SEEN
-    # One awk pass over every file rather than one process per file. Only the
-    # [Desktop Entry] group counts; localised keys (Name[de]=) are skipped
-    # because the pattern requires = or space directly after the key.
-    while IFS=$'\t' read -r file name gen; do
-        id=${file##*/}
-        [[ -n ${SEEN[$id]:-} ]] && continue
-        SEEN[$id]=1
-        label="$APP_ICON  $name"
-        [[ -n $gen ]] && label+="  ·  $gen"
-        add "$label" "app:$file"
-    done < <(awk '
-        function flush() {
-            if (file != "" && !skip && type_ok && name != "")
-                print file "\t" name "\t" gen
-        }
-        FNR == 1 { flush(); file = FILENAME; name = ""; gen = ""; skip = 0; in_de = 0; type_ok = 0 }
-        /^\[/ { in_de = ($0 == "[Desktop Entry]"); next }
-        !in_de { next }
-        /^NoDisplay[ \t]*=[ \t]*true/ { skip = 1 }
-        /^Hidden[ \t]*=[ \t]*true/ { skip = 1 }
-        /^Type[ \t]*=[ \t]*Application/ { type_ok = 1 }
-        /^Name[ \t]*=/ && name == "" { l = $0; sub(/^Name[ \t]*=[ \t]*/, "", l); name = l }
-        /^GenericName[ \t]*=/ && gen == "" { l = $0; sub(/^GenericName[ \t]*=[ \t]*/, "", l); gen = l }
-        END { flush() }
-    ' "${DESKTOP_FILES[@]}" | sort -t$'\t' -k2,2 -f)
-fi
+# Rows come from the resolver, which uses Gio.AppInfo: that honours NoDisplay,
+# Hidden and OnlyShowIn/NotShowIn, which a hand-rolled .desktop parse gets
+# wrong, and is already sorted by name.
+for row in "${APP_ROWS[@]:-}"; do
+    [[ -z $row ]] && continue
+    IFS=$'\t' read -r file icon name generic <<<"$row"
+    [[ -z $name ]] && continue
+    [[ -z $icon ]] && icon=$FALLBACK_ICON
+    label=$name
+    [[ -n $generic ]] && label+="  ·  $generic"
+    add "$icon" "$label" "app:$file"
+done
 
 # --- pick and act ---------------------------------------------------------
 
