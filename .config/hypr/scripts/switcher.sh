@@ -1,32 +1,34 @@
 #!/bin/bash
-# One switcher for Hyprland windows and tmux panes.
+# One menu for everything: Hyprland windows, tmux windows, and installed apps.
 #
-# Picking a window focuses it. Picking a tmux pane focuses the terminal whose
-# client is attached to that pane's session and then moves tmux to the pane,
-# so a single keystroke reaches anything regardless of which side of the
-# compositor/multiplexer boundary it lives on.
+# Things that already exist are listed first, applications after, so the same
+# keystroke either takes you to a running thing or starts a new one -- you
+# type a name without having to remember which of the two it is.
 #
-# Terminals hosting an attached tmux client are dropped from the window half
-# of the list: their panes are already listed individually, and focusing any
-# pane focuses the terminal anyway.
+# Picking a tmux window focuses the terminal whose client is attached to that
+# session and then moves tmux to the window, so the compositor/multiplexer
+# split stops mattering. Terminals hosting an attached client are dropped from
+# the window list, since their tmux windows are listed individually and
+# focusing one raises the terminal anyway.
 
 set -u
 
 TMUX_BIN=/usr/bin/tmux
-MENU=(wofi --dmenu -i --prompt "Switch to" --width 950 --height 560
+MENU=(wofi --dmenu -i --prompt "Go to" --width 950 --height 560
       --style "$HOME/.config/wofi/switcher.css")
 
 # Nerd Font glyphs, written as escapes so the codepoints survive editing.
-WIN_ICON=$'\U000f05af'   # nf-md-window_maximize
+WIN_ICON=$'\U000f05af'       # nf-md-window_maximize
 WIN_TMUX_ICON=$'\U000f018d'  # nf-md-console
+APP_ICON=$'\U000f003b'       # nf-md-apps
 
 declare -A ACTION
 declare -a LINES
 
 add() { # add <label> <action>
     local label=$1 n=2
-    # Two panes can share a title, and the menu is keyed by its visible text,
-    # so make collisions unique rather than letting one shadow the other.
+    # Two entries can share a label, and the menu is keyed by its visible
+    # text, so make collisions unique rather than letting one shadow another.
     while [[ -n ${ACTION[$label]:-} ]]; do
         label="$1 ($n)"
         ((n++))
@@ -53,6 +55,8 @@ window_for_tty() {
     return 1
 }
 
+# --- running things -------------------------------------------------------
+
 HOSTS=" "
 HAVE_TMUX=0
 if $TMUX_BIN has-session 2>/dev/null; then
@@ -78,6 +82,55 @@ if ((HAVE_TMUX)); then
     done < <($TMUX_BIN list-windows -a -F $'#{window_id}\t#{session_name}:#{window_index}  ·  #{window_name}  ·  #{pane_current_command}')
 fi
 
+# --- installed apps -------------------------------------------------------
+
+# Directories in XDG precedence order; the first .desktop file for a given
+# basename wins, so a user override shadows the system copy.
+APP_DIRS=(
+    "$HOME/.local/share/applications"
+    /usr/local/share/applications
+    /usr/share/applications
+    "$HOME/.local/share/flatpak/exports/share/applications"
+    /var/lib/flatpak/exports/share/applications
+)
+
+mapfile -t DESKTOP_FILES < <(
+    for d in "${APP_DIRS[@]}"; do
+        [[ -d $d ]] && find "$d" -name '*.desktop' -type f 2>/dev/null | sort
+    done
+)
+
+if ((${#DESKTOP_FILES[@]})); then
+    declare -A SEEN
+    # One awk pass over every file rather than one process per file. Only the
+    # [Desktop Entry] group counts; localised keys (Name[de]=) are skipped
+    # because the pattern requires = or space directly after the key.
+    while IFS=$'\t' read -r file name gen; do
+        id=${file##*/}
+        [[ -n ${SEEN[$id]:-} ]] && continue
+        SEEN[$id]=1
+        label="$APP_ICON  $name"
+        [[ -n $gen ]] && label+="  ·  $gen"
+        add "$label" "app:$file"
+    done < <(awk '
+        function flush() {
+            if (file != "" && !skip && type_ok && name != "")
+                print file "\t" name "\t" gen
+        }
+        FNR == 1 { flush(); file = FILENAME; name = ""; gen = ""; skip = 0; in_de = 0; type_ok = 0 }
+        /^\[/ { in_de = ($0 == "[Desktop Entry]"); next }
+        !in_de { next }
+        /^NoDisplay[ \t]*=[ \t]*true/ { skip = 1 }
+        /^Hidden[ \t]*=[ \t]*true/ { skip = 1 }
+        /^Type[ \t]*=[ \t]*Application/ { type_ok = 1 }
+        /^Name[ \t]*=/ && name == "" { l = $0; sub(/^Name[ \t]*=[ \t]*/, "", l); name = l }
+        /^GenericName[ \t]*=/ && gen == "" { l = $0; sub(/^GenericName[ \t]*=[ \t]*/, "", l); gen = l }
+        END { flush() }
+    ' "${DESKTOP_FILES[@]}" | sort -t$'\t' -k2,2 -f)
+fi
+
+# --- pick and act ---------------------------------------------------------
+
 ((${#LINES[@]})) || exit 0
 
 CHOICE=$(printf '%s\n' "${LINES[@]}" | "${MENU[@]}") || exit 0
@@ -97,7 +150,7 @@ tmux:*)
         awk -v s="$session" '$2 == s { print $1; exit }')
     [[ -z $ctty ]] && ctty=$($TMUX_BIN list-clients -F '#{client_tty}' | head -n1)
 
-    # Nothing attached anywhere: the session exists but has no terminal.
+    # The session exists but has no terminal anywhere: give it one.
     if [[ -z $ctty ]]; then
         exec setsid ghostty -e "$TMUX_BIN" attach -t "$session"
     fi
@@ -107,5 +160,10 @@ tmux:*)
     fi
     $TMUX_BIN switch-client -c "$ctty" -t "$session"
     $TMUX_BIN select-window -t "$win"
+    ;;
+app:*)
+    # gio handles Exec field codes, Terminal=true and DBusActivatable, none of
+    # which a naive Exec= parse gets right.
+    exec setsid gio launch "${TARGET#app:}" >/dev/null 2>&1
     ;;
 esac
