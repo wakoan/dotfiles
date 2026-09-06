@@ -1,0 +1,24 @@
+/* Switcher menu: the shared style at a larger size.
+ *
+ * The app launcher (SUPER+space) stays compact on style.css; only the
+ * window/pane switcher pulls this in, via --style. Importing rather than
+ * copying means theme changes to style.css still reach both.
+ *
+ * The path must be absolute: wofi hands GTK the stylesheet as in-memory data,
+ * so a relative url() resolves against the working directory of whatever
+ * launched wofi rather than against this file. */
+
+@import url("file:///home/wako/.config/wofi/style.css");
+
+window {
+    font-size: 17px;
+}
+
+#entry {
+    padding: 7px 10px;
+}
+
+#input {
+    font-size: 17px;
+    padding: 8px 12px;
+}

@@ -13,11 +13,12 @@
 set -u
 
 TMUX_BIN=/usr/bin/tmux
-MENU=(wofi --dmenu -i --prompt "Switch to" --width 950 --height 520)
+MENU=(wofi --dmenu -i --prompt "Switch to" --width 950 --height 560
+      --style "$HOME/.config/wofi/switcher.css")
 
 # Nerd Font glyphs, written as escapes so the codepoints survive editing.
 WIN_ICON=$'\U000f05af'   # nf-md-window_maximize
-PANE_ICON=$'\U000f018d'  # nf-md-console
+WIN_TMUX_ICON=$'\U000f018d'  # nf-md-console
 
 declare -A ACTION
 declare -a LINES
@@ -70,9 +71,11 @@ while IFS=$'\t' read -r addr ws class title; do
 done < <(jq -r '.[] | [.address, (.workspace.name|tostring), .class, .title] | @tsv' <<<"$HYPR_JSON")
 
 if ((HAVE_TMUX)); then
-    while IFS=$'\t' read -r pane label; do
-        add "$PANE_ICON  $label" "tmux:$pane"
-    done < <($TMUX_BIN list-panes -a -F $'#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}  ·  #{pane_current_command}  ·  #{pane_title}')
+    # Windows, not panes: a tmux window carries a name the user chose, which
+    # identifies it far better than the pane titles the shell happens to set.
+    while IFS=$'\t' read -r win label; do
+        add "$WIN_TMUX_ICON  $label" "tmux:$win"
+    done < <($TMUX_BIN list-windows -a -F $'#{window_id}\t#{session_name}:#{window_index}  ·  #{window_name}  ·  #{pane_current_command}')
 fi
 
 ((${#LINES[@]})) || exit 0
@@ -86,8 +89,8 @@ win:*)
     hyprctl dispatch focuswindow "address:${TARGET#win:}"
     ;;
 tmux:*)
-    pane=${TARGET#tmux:}
-    session=$($TMUX_BIN display -pt "$pane" '#{session_name}')
+    win=${TARGET#tmux:}
+    session=$($TMUX_BIN display -pt "$win" '#{session_name}')
 
     # Prefer a client already on that session; any client will do otherwise.
     ctty=$($TMUX_BIN list-clients -F '#{client_tty} #{client_session}' |
@@ -103,7 +106,6 @@ tmux:*)
         hyprctl dispatch focuswindow "address:$addr"
     fi
     $TMUX_BIN switch-client -c "$ctty" -t "$session"
-    $TMUX_BIN select-window -t "$pane"
-    $TMUX_BIN select-pane -t "$pane"
+    $TMUX_BIN select-window -t "$win"
     ;;
 esac
