@@ -61,13 +61,49 @@ window#waybar {
     background: @mauve;
     color: @crust;
 }
+#workspaces button:hover {
+    background: @surface0;
+    color: @text;
+}
+
+/* Per-workspace accents.
+ *
+ * hyprland/workspaces renders one button per workspace with no per-workspace
+ * id, so they are addressed positionally with :nth-child. Each number keeps
+ * its own colour in both states: as the text colour while idle, and as the
+ * background while active. The pairs are listed together so a colour is only
+ * written once per workspace. */
+#workspaces button:nth-child(1)         { color: @mauve; }
+#workspaces button:nth-child(1).active  { background: @mauve; color: @crust; }
+#workspaces button:nth-child(2)         { color: @blue; }
+#workspaces button:nth-child(2).active  { background: @blue; color: @crust; }
+#workspaces button:nth-child(3)         { color: @teal; }
+#workspaces button:nth-child(3).active  { background: @teal; color: @crust; }
+#workspaces button:nth-child(4)         { color: @green; }
+#workspaces button:nth-child(4).active  { background: @green; color: @crust; }
+#workspaces button:nth-child(5)         { color: @yellow; }
+#workspaces button:nth-child(5).active  { background: @yellow; color: @crust; }
+#workspaces button:nth-child(6)         { color: @peach; }
+#workspaces button:nth-child(6).active  { background: @peach; color: @crust; }
+#workspaces button:nth-child(7)         { color: @red; }
+#workspaces button:nth-child(7).active  { background: @red; color: @crust; }
+#workspaces button:nth-child(8)         { color: @text; }
+#workspaces button:nth-child(8).active  { background: @text; color: @crust; }
+
+/* Workspaces that exist but hold no windows keep their colour, just quieter,
+ * so the row still reads as a palette without shouting. */
+#workspaces button.empty {
+    opacity: 0.45;
+}
+
+/* Declared after the accents so urgency outranks a workspace's own colour --
+ * these selectors carry the same specificity, so order decides. */
 #workspaces button.urgent {
     background: @red;
     color: @crust;
 }
-#workspaces button:hover {
-    background: @surface0;
-    color: @text;
+#workspaces button.urgent.empty {
+    opacity: 1;
 }
 
 /* Right-side accents */
