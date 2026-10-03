@@ -17,7 +17,7 @@ LINK="$HOME/.config/hypr/current-wallpaper"
 DEFAULT="$HOME/.config/hypr/wallpapers/1.jpg"
 
 # Overridable per invocation: WALLPAPER_TRANSITION=wipe wallpaper.sh pic.jpg
-TRANSITION=${WALLPAPER_TRANSITION:-grow}
+TRANSITION=${WALLPAPER_TRANSITION:-random}
 DURATION=${WALLPAPER_TRANSITION_DURATION:-1.2}
 # swww composites on the CPU and this is an Iris Pro 5200 driving 2880x1800,
 # so 30fps keeps the animation smooth without pinning a core.
