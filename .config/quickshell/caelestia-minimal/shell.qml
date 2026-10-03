@@ -18,6 +18,106 @@ ShellRoot {
         onTriggered: root.tick++
     }
 
+    // A popup surface with inverse ("notch") corners: square where it meets
+    // the bar, a concave fillet just outside each top corner, and rounded at
+    // the bottom, so the bar's edge curves down into the sheet. Children are
+    // placed inside the sheet.
+    //
+    // The fillets are siblings of the card, pinned at y = 0, so they are drawn
+    // from the first frame even while the card slides in behind them.
+    component NotchedSheet: Item {
+        id: sheetRoot
+        property int flare: 22
+        property color surface: "#171923"
+        property color stroke: "#53586d"
+        property int bottomRadius: 26
+        // The popup's open state. A Canvas in a window that starts hidden never
+        // gets a first paint, and items receive no signal when their window is
+        // mapped, so the owner passes visibility in explicitly.
+        property bool active: false
+        default property alias content: card.data
+
+        onActiveChanged: {
+            flareLeft.requestPaint()
+            flareRight.requestPaint()
+        }
+
+        Rectangle {
+            id: card
+            x: sheetRoot.flare
+            // Slides out of the notch. The window clips anything above its top
+            // edge, so the card is simply parked above it while closed.
+            y: sheetRoot.active ? 0 : -sheetRoot.height
+            width: sheetRoot.width - sheetRoot.flare * 2
+            height: sheetRoot.height
+            Behavior on y { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
+            color: sheetRoot.surface
+            border.width: 1
+            border.color: sheetRoot.stroke
+            topLeftRadius: 0
+            topRightRadius: 0
+            bottomLeftRadius: sheetRoot.bottomRadius
+            bottomRightRadius: sheetRoot.bottomRadius
+
+            // Rectangle draws its border on all four sides with no per-edge
+            // control. Paint over the runs that would read as a seam: the top
+            // edge against the bar, and the top `flare` pixels of each side
+            // against a fillet.
+            Rectangle { x: 0; y: 0; width: parent.width; height: 2; color: sheetRoot.surface }
+            Rectangle { x: 0; y: 0; width: 2; height: sheetRoot.flare; color: sheetRoot.surface }
+            Rectangle { x: parent.width - 2; y: 0; width: 2; height: sheetRoot.flare; color: sheetRoot.surface }
+        }
+
+        Canvas {
+            id: flareLeft
+            x: 0; y: 0
+            width: sheetRoot.flare; height: sheetRoot.flare
+            Component.onCompleted: requestPaint()
+            onPaint: {
+                var r = width
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.beginPath()
+                ctx.moveTo(0, 0)
+                ctx.lineTo(r, 0)
+                ctx.lineTo(r, r)
+                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
+                ctx.closePath()
+                ctx.fillStyle = sheetRoot.surface
+                ctx.fill()
+                ctx.beginPath()
+                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
+                ctx.strokeStyle = sheetRoot.stroke
+                ctx.lineWidth = 1
+                ctx.stroke()
+            }
+        }
+        Canvas {
+            id: flareRight
+            x: sheetRoot.width - width; y: 0
+            width: sheetRoot.flare; height: sheetRoot.flare
+            Component.onCompleted: requestPaint()
+            onPaint: {
+                var r = width
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.beginPath()
+                ctx.moveTo(r, 0)
+                ctx.lineTo(0, 0)
+                ctx.lineTo(0, r)
+                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
+                ctx.closePath()
+                ctx.fillStyle = sheetRoot.surface
+                ctx.fill()
+                ctx.beginPath()
+                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
+                ctx.strokeStyle = sheetRoot.stroke
+                ctx.lineWidth = 1
+                ctx.stroke()
+            }
+        }
+    }
+
     Variants {
         model: Quickshell.screens
 
@@ -638,7 +738,7 @@ ShellRoot {
                     id: audioPopup
                     visible: barWindow.audioOpen
                     color: "transparent"
-                    implicitWidth: 390
+                    implicitWidth: 390 + 44
                     implicitHeight: 420
                     HyprlandFocusGrab {
                         active: barWindow.audioOpen
@@ -655,140 +755,108 @@ ShellRoot {
                         rect.width: 1
                         rect.height: 1
                     }
-                    Rectangle {
+                    
+                    
+                    NotchedSheet {
                         anchors.fill: parent
-                        anchors.topMargin: 14
-                        radius: 24
-                        color: "#20232f"
-                        border.width: 1
-                        border.color: "#53586d"
-                    }
-                    Canvas {
-                        id: audioNotch
-                        width: 86; height: 26
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.reset()
-                            ctx.beginPath()
-                            ctx.moveTo(0, 26)
-                            ctx.lineTo(0, 15)
-                            ctx.bezierCurveTo(0, 6, 10, 0, 20, 0)
-                            ctx.lineTo(66, 0)
-                            ctx.bezierCurveTo(76, 0, 86, 6, 86, 15)
-                            ctx.lineTo(86, 26)
-                            ctx.closePath()
-                            ctx.fillStyle = "#20232f"
-                            ctx.fill()
-                            ctx.strokeStyle = "#53586d"
-                            ctx.lineWidth = 1
-                            ctx.stroke()
-                        }
-                    }
+                        active: barWindow.audioOpen
                     ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        anchors.topMargin: 32
-                        opacity: barWindow.audioOpen ? 1 : 0
-                        scale: barWindow.audioOpen ? 1 : 0.96
-                        transformOrigin: Item.TopRight
-                        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                        spacing: 10
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "󰕾"; color: "#c9cbf5"; font.pixelSize: 30 }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 1
-                                Text { text: "Audio"; color: "#eceefe"; font.pixelSize: 19; font.bold: true }
-                                Text { text: "EASY LISTENING"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
-                            }
-                            Rectangle {
-                                Layout.preferredWidth: 42; Layout.preferredHeight: 28; radius: 5
-                                color: barWindow.audioText.indexOf("muted") >= 0 ? "#454858" : "#333747"
-                                Text { anchors.centerIn: parent; text: barWindow.audioText.indexOf("muted") >= 0 ? "󰖁" : "󰕾"; color: "#d9dbff"; font.pixelSize: 16 }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: barWindow.toggleAudioMute() }
-                            }
-                        }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "OUTPUT"; color: "#9da1bb"; font.pixelSize: 12; font.bold: true }
-                            Item { Layout.fillWidth: true }
-                            Text { text: barWindow.audioText.match(/[0-9]+/) || "Muted"; color: "#c9cbf5"; font.pixelSize: 13; font.bold: true }
-                        }
-                        Rectangle {
-                            id: volumeTrack
-                            Layout.fillWidth: true; Layout.preferredHeight: 10
-                            radius: 6
-                            color: "#353846"
-                            Rectangle {
-                                width: volumeTrack.width * Math.max(0, Math.min(1, Number(barWindow.audioText.match(/[0-9]+/) || 0) / 100))
-                                height: parent.height
-                                radius: parent.radius
-                                color: "#c9cbf5"
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: function(mouse) { barWindow.setAudioVolume(mouse.x / width) }
-                                onWheel: function(wheel) {
-                                    var current = Number(barWindow.audioText.match(/[0-9]+/) || 0) / 100
-                                    barWindow.setAudioVolume(current + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 10
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "󰕾"; color: "#c9cbf5"; font.pixelSize: 30 }
+                                ColumnLayout {
+                                    Layout.fillWidth: true; spacing: 1
+                                    Text { text: "Audio"; color: "#eceefe"; font.pixelSize: 19; font.bold: true }
+                                    Text { text: "EASY LISTENING"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                                }
+                                Rectangle {
+                                    Layout.preferredWidth: 42; Layout.preferredHeight: 28; radius: 5
+                                    color: barWindow.audioText.indexOf("muted") >= 0 ? "#454858" : "#333747"
+                                    Text { anchors.centerIn: parent; text: barWindow.audioText.indexOf("muted") >= 0 ? "󰖁" : "󰕾"; color: "#d9dbff"; font.pixelSize: 16 }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: barWindow.toggleAudioMute() }
                                 }
                             }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 6
-                            color: !barWindow.airpodsConnected ? "#414357" : "#252833"
-                            Text { anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: "󰓃  Laptop Speakers"; color: "#eceefe"; font.pixelSize: 15 }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 56; radius: 6
-                            color: barWindow.airpodsConnected ? "#414357" : "#252833"
-                            Column {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-                                Text { text: "󰋋  Andrey’s AirPods #3"; color: "#eceefe"; font.pixelSize: 15 }
-                                Text { text: barWindow.airpodsConnected ? barWindow.airpodsBatteryText : "Disconnected"; color: "#b8bdd3"; font.pixelSize: 11 }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "OUTPUT"; color: "#9da1bb"; font.pixelSize: 12; font.bold: true }
+                                Item { Layout.fillWidth: true }
+                                Text { text: barWindow.audioText.match(/[0-9]+/) || "Muted"; color: "#c9cbf5"; font.pixelSize: 13; font.bold: true }
                             }
-                            Text {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: bluetoothAction.running ? "Working…" : (barWindow.airpodsConnected ? "Disconnect" : "Connect")
-                                color: "#c9cbf5"
-                                font.pixelSize: 12
+                            Rectangle {
+                                id: volumeTrack
+                                Layout.fillWidth: true; Layout.preferredHeight: 10
+                                radius: 6
+                                color: "#353846"
+                                Rectangle {
+                                    width: volumeTrack.width * Math.max(0, Math.min(1, Number(barWindow.audioText.match(/[0-9]+/) || 0) / 100))
+                                    height: parent.height
+                                    radius: parent.radius
+                                    color: "#c9cbf5"
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: function(mouse) { barWindow.setAudioVolume(mouse.x / width) }
+                                    onWheel: function(wheel) {
+                                        var current = Number(barWindow.audioText.match(/[0-9]+/) || 0) / 100
+                                        barWindow.setAudioVolume(current + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))
+                                    }
+                                }
                             }
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: !bluetoothAction.running
-                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: barWindow.toggleAirPods()
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 6
+                                color: !barWindow.airpodsConnected ? "#414357" : "#252833"
+                                Text { anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: "󰓃  Laptop Speakers"; color: "#eceefe"; font.pixelSize: 15 }
                             }
-                        }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "INPUT"; color: "#9da1bb"; font.pixelSize: 12; font.bold: true }
-                            Item { Layout.fillWidth: true }
-                            Text { text: Math.round(barWindow.inputVolume * 100) + "%"; color: "#c9cbf5"; font.pixelSize: 13; font.bold: true }
-                        }
-                        Rectangle {
-                            id: inputTrack
-                            Layout.fillWidth: true; Layout.preferredHeight: 10; radius: 6; color: "#353846"
-                            Rectangle { width: inputTrack.width * Math.max(0, Math.min(1, barWindow.inputVolume)); height: parent.height; radius: parent.radius; color: "#c9cbf5" }
-                            MouseArea { anchors.fill: parent; enabled: barWindow.audioSourceReady; onClicked: function(mouse) { barWindow.setInputVolume(mouse.x / width) } }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 6; color: "#252833"
-                            Text {
-                                anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
-                                text: "󰍬  " + (barWindow.audioSourceReady ? (barWindow.audioSource.description || "Built-in Microphone") : "No microphone")
-                                color: "#eceefe"; font.pixelSize: 15; elide: Text.ElideRight; width: parent.width - 28
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 56; radius: 6
+                                color: barWindow.airpodsConnected ? "#414357" : "#252833"
+                                Column {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 2
+                                    Text { text: "󰋋  Andrey’s AirPods #3"; color: "#eceefe"; font.pixelSize: 15 }
+                                    Text { text: barWindow.airpodsConnected ? barWindow.airpodsBatteryText : "Disconnected"; color: "#b8bdd3"; font.pixelSize: 11 }
+                                }
+                                Text {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: bluetoothAction.running ? "Working…" : (barWindow.airpodsConnected ? "Disconnect" : "Connect")
+                                    color: "#c9cbf5"
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: !bluetoothAction.running
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: barWindow.toggleAirPods()
+                                }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "INPUT"; color: "#9da1bb"; font.pixelSize: 12; font.bold: true }
+                                Item { Layout.fillWidth: true }
+                                Text { text: Math.round(barWindow.inputVolume * 100) + "%"; color: "#c9cbf5"; font.pixelSize: 13; font.bold: true }
+                            }
+                            Rectangle {
+                                id: inputTrack
+                                Layout.fillWidth: true; Layout.preferredHeight: 10; radius: 6; color: "#353846"
+                                Rectangle { width: inputTrack.width * Math.max(0, Math.min(1, barWindow.inputVolume)); height: parent.height; radius: parent.radius; color: "#c9cbf5" }
+                                MouseArea { anchors.fill: parent; enabled: barWindow.audioSourceReady; onClicked: function(mouse) { barWindow.setInputVolume(mouse.x / width) } }
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 6; color: "#252833"
+                                Text {
+                                    anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
+                                    text: "󰍬  " + (barWindow.audioSourceReady ? (barWindow.audioSource.description || "Built-in Microphone") : "No microphone")
+                                    color: "#eceefe"; font.pixelSize: 15; elide: Text.ElideRight; width: parent.width - 28
+                                }
                             }
                         }
                     }
@@ -796,8 +864,8 @@ ShellRoot {
 
                 PopupWindow {
                     visible: barWindow.bluetoothOpen
-                    color: "#202124"
-                    implicitWidth: 280
+                    color: "transparent"
+                    implicitWidth: 280 + 44
                     implicitHeight: 150
                     id: bluetoothPopup
                     HyprlandFocusGrab {
@@ -805,148 +873,146 @@ ShellRoot {
                         windows: [barWindow, bluetoothPopup]
                         onCleared: barWindow.closePopups("")
                     }
-                    anchor { window: barWindow; edges: Edges.Top | Edges.Right; gravity: Edges.Bottom | Edges.Right; rect.x: barWindow.width - 135; rect.y: barWindow.height + 8; rect.width: 1; rect.height: 1 }
-                    Column {
+                    anchor { window: barWindow; edges: Edges.Top | Edges.Right; gravity: Edges.Bottom | Edges.Right; rect.x: barWindow.width - 135; rect.y: barWindow.height; rect.width: 1; rect.height: 1 }
+                    NotchedSheet {
                         anchors.fill: parent
-                        anchors.margins: 12
-                        opacity: barWindow.bluetoothOpen ? 1 : 0
-                        scale: barWindow.bluetoothOpen ? 1 : 0.96
-                        transformOrigin: Item.TopRight
-                        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                        spacing: 8
-                        Text { text: barWindow.bluetoothText || "Bluetooth unavailable"; color: "#e8eaed"; font.pixelSize: 12; wrapMode: Text.Wrap }
-                        Text {
-                            text: barWindow.bluetoothText.indexOf("Powered: yes") >= 0 ? "Turn Bluetooth off" : "Turn Bluetooth on"
-                            color: "#8ab4f8"
-                            font.pixelSize: 12
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    bluetoothAction.command = ["bluetoothctl", "power", barWindow.bluetoothText.indexOf("Powered: yes") >= 0 ? "off" : "on"]
-                                    bluetoothAction.running = true
+                        active: barWindow.bluetoothOpen
+                    Column {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 8
+                            Text { text: barWindow.bluetoothText || "Bluetooth unavailable"; color: "#e8eaed"; font.pixelSize: 12; wrapMode: Text.Wrap }
+                            Text {
+                                text: barWindow.bluetoothText.indexOf("Powered: yes") >= 0 ? "Turn Bluetooth off" : "Turn Bluetooth on"
+                                color: "#8ab4f8"
+                                font.pixelSize: 12
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        bluetoothAction.command = ["bluetoothctl", "power", barWindow.bluetoothText.indexOf("Powered: yes") >= 0 ? "off" : "on"]
+                                        bluetoothAction.running = true
+                                    }
                                 }
                             }
+                            Text { text: "Close"; color: "#8ab4f8"; font.pixelSize: 12; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: barWindow.bluetoothOpen = false } }
                         }
-                        Text { text: "Close"; color: "#8ab4f8"; font.pixelSize: 12; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: barWindow.bluetoothOpen = false } }
                     }
                 }
 
                 PopupWindow {
                     id: agentPopup
                     visible: barWindow.agentOpen
-                    color: "#1b1d27"
-                    implicitWidth: 390
+                    color: "transparent"
+                    implicitWidth: 390 + 44
                     implicitHeight: 430
                     HyprlandFocusGrab {
                         active: barWindow.agentOpen
                         windows: [barWindow, agentPopup]
                         onCleared: barWindow.closePopups("")
                     }
-                    anchor { window: barWindow; edges: Edges.Top | Edges.Right; gravity: Edges.Bottom | Edges.Right; rect.x: barWindow.width - 170; rect.y: barWindow.height + 8; rect.width: 1; rect.height: 1 }
-                    ColumnLayout {
+                    anchor { window: barWindow; edges: Edges.Top | Edges.Right; gravity: Edges.Bottom | Edges.Right; rect.x: barWindow.width - 170; rect.y: barWindow.height; rect.width: 1; rect.height: 1 }
+                    NotchedSheet {
                         anchors.fill: parent
-                        anchors.margins: 18
-                        opacity: barWindow.agentOpen ? 1 : 0
-                        scale: barWindow.agentOpen ? 1 : 0.96
-                        transformOrigin: Item.TopRight
-                        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                        spacing: 12
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Rectangle {
-                                Layout.preferredWidth: 32; Layout.preferredHeight: 32; radius: 8
-                                color: barWindow.selectedAgent === "codex" ? "#276a5a" : "transparent"
-                                Image {
-                                    anchors.centerIn: parent
-                                    source: barWindow.selectedAgent === "codex"
-                                        ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/codex.svg"
-                                        : (barWindow.selectedAgent === "claude"
-                                            ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/claude.svg"
-                                            : "file:///home/wako/.config/quickshell/caelestia-minimal/assets/antigravity-light.svg")
-                                    width: 26; height: 26; fillMode: Image.PreserveAspectFit
-                                }
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 1
-                                Text { text: barWindow.selectedAgent === "codex" ? "Codex" : (barWindow.selectedAgent === "claude" ? "Claude Code" : "Antigravity"); color: "#f5e8df"; font.pixelSize: 19; font.bold: true }
-                                Text { text: "LOCAL AGENT ACTIVITY"; color: "#b6a29a"; font.pixelSize: 11; font.bold: true }
-                            }
-                            Text { text: barWindow.agentProcessesText + " active"; color: "#f1bd90"; font.pixelSize: 13 }
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true; spacing: 8
-                            Repeater {
-                                model: ["Codex", "Claude", "Antigravity"]
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 6
-                                    readonly property string key: modelData === "Codex" ? "codex" : (modelData === "Claude" ? "claude" : "antigravity")
-                                    color: barWindow.selectedAgent === key ? "#414357" : "#252833"
-                                    border.width: 1; border.color: barWindow.selectedAgent === key ? "#777b98" : "#454858"
-                                    Row {
-                                        anchors.centerIn: parent; spacing: 6
-                                        Rectangle {
-                                            width: 18; height: 18; radius: 5
-                                            color: modelData === "Codex" ? "#276a5a" : "transparent"
-                                            Image {
-                                                anchors.centerIn: parent
-                                                source: modelData === "Codex"
-                                                    ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/codex.svg"
-                                                    : (modelData === "Claude"
-                                                        ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/claude.svg"
-                                                        : "file:///home/wako/.config/quickshell/caelestia-minimal/assets/antigravity-light.svg")
-                                                width: 15; height: 15; fillMode: Image.PreserveAspectFit
-                                            }
-                                        }
-                                        Text { text: modelData; color: parent.parent.color === "#414357" ? "#f0f1ff" : "#8d91a8"; font.pixelSize: 13 }
-                                    }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { barWindow.selectedAgent = parent.key; barWindow.refreshAgentStats() } }
-                                }
-                            }
-                        }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
-                        Text { text: "TODAY"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
-                        RowLayout {
-                            Layout.fillWidth: true; spacing: 10
-                            Repeater {
-                                model: [["Sessions", barWindow.agentSessionsText], ["Records", barWindow.agentTurnsText], ["Processes", barWindow.agentProcessesText]]
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    Layout.fillWidth: true; Layout.preferredHeight: 66; radius: 7; color: "#252833"
-                                    Column { anchors.centerIn: parent; spacing: 4
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData[1]; color: "#e9d7ca"; font.pixelSize: 23; font.bold: true }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData[0].toUpperCase(); color: "#9da1bb"; font.pixelSize: 10; font.bold: true }
-                                    }
-                                }
-                            }
-                        }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
-                        Text { text: "USAGE LIMITS"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
-                        Repeater {
-                            model: barWindow.agentLimits
-                            delegate: ColumnLayout {
-                                required property var modelData
-                                Layout.fillWidth: true; spacing: 4
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: modelData.label; color: "#d9dced"; font.pixelSize: 13 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: modelData.percent + "%"; color: "#e9d7ca"; font.pixelSize: 13; font.bold: true }
-                                }
+                        active: barWindow.agentOpen
+                    ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 12
+                            RowLayout {
+                                Layout.fillWidth: true
                                 Rectangle {
-                                    Layout.fillWidth: true; Layout.preferredHeight: 7; radius: 4; color: "#353846"
-                                    Rectangle { width: parent.width * Math.max(0, Math.min(1, modelData.percent / 100)); height: parent.height; radius: parent.radius; color: modelData.percent >= 80 ? "#ef8b8b" : "#c9cbf5" }
+                                    Layout.preferredWidth: 32; Layout.preferredHeight: 32; radius: 8
+                                    color: barWindow.selectedAgent === "codex" ? "#276a5a" : "transparent"
+                                    Image {
+                                        anchors.centerIn: parent
+                                        source: barWindow.selectedAgent === "codex"
+                                            ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/codex.svg"
+                                            : (barWindow.selectedAgent === "claude"
+                                                ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/claude.svg"
+                                                : "file:///home/wako/.config/quickshell/caelestia-minimal/assets/antigravity-light.svg")
+                                        width: 26; height: 26; fillMode: Image.PreserveAspectFit
+                                    }
                                 }
-                                Text { text: barWindow.formatLimitReset(modelData.reset); color: "#8d91a8"; font.pixelSize: 11 }
+                                ColumnLayout {
+                                    Layout.fillWidth: true; spacing: 1
+                                    Text { text: barWindow.selectedAgent === "codex" ? "Codex" : (barWindow.selectedAgent === "claude" ? "Claude Code" : "Antigravity"); color: "#f5e8df"; font.pixelSize: 19; font.bold: true }
+                                    Text { text: "LOCAL AGENT ACTIVITY"; color: "#b6a29a"; font.pixelSize: 11; font.bold: true }
+                                }
+                                Text { text: barWindow.agentProcessesText + " active"; color: "#f1bd90"; font.pixelSize: 13 }
                             }
-                        }
-                        Rectangle {
-                            visible: barWindow.agentLimits.length === 0
-                            Layout.fillWidth: true; Layout.preferredHeight: visible ? 52 : 0; radius: 7; color: "#252833"
-                            Text { anchors.fill: parent; anchors.margins: 10; text: barWindow.selectedAgent === "antigravity" ? "Antigravity does not expose account limits locally." : "No usage-limit record is available yet."; color: "#b9bdce"; font.pixelSize: 12; wrapMode: Text.Wrap; verticalAlignment: Text.AlignVCenter }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Repeater {
+                                    model: ["Codex", "Claude", "Antigravity"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 6
+                                        readonly property string key: modelData === "Codex" ? "codex" : (modelData === "Claude" ? "claude" : "antigravity")
+                                        color: barWindow.selectedAgent === key ? "#414357" : "#252833"
+                                        border.width: 1; border.color: barWindow.selectedAgent === key ? "#777b98" : "#454858"
+                                        Row {
+                                            anchors.centerIn: parent; spacing: 6
+                                            Rectangle {
+                                                width: 18; height: 18; radius: 5
+                                                color: modelData === "Codex" ? "#276a5a" : "transparent"
+                                                Image {
+                                                    anchors.centerIn: parent
+                                                    source: modelData === "Codex"
+                                                        ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/codex.svg"
+                                                        : (modelData === "Claude"
+                                                            ? "file:///home/wako/.local/share/quattro/shell/plugins/agents/assets/claude.svg"
+                                                            : "file:///home/wako/.config/quickshell/caelestia-minimal/assets/antigravity-light.svg")
+                                                    width: 15; height: 15; fillMode: Image.PreserveAspectFit
+                                                }
+                                            }
+                                            Text { text: modelData; color: parent.parent.color === "#414357" ? "#f0f1ff" : "#8d91a8"; font.pixelSize: 13 }
+                                        }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { barWindow.selectedAgent = parent.key; barWindow.refreshAgentStats() } }
+                                    }
+                                }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
+                            Text { text: "TODAY"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 10
+                                Repeater {
+                                    model: [["Sessions", barWindow.agentSessionsText], ["Records", barWindow.agentTurnsText], ["Processes", barWindow.agentProcessesText]]
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true; Layout.preferredHeight: 66; radius: 7; color: "#252833"
+                                        Column { anchors.centerIn: parent; spacing: 4
+                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData[1]; color: "#e9d7ca"; font.pixelSize: 23; font.bold: true }
+                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData[0].toUpperCase(); color: "#9da1bb"; font.pixelSize: 10; font.bold: true }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
+                            Text { text: "USAGE LIMITS"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                            Repeater {
+                                model: barWindow.agentLimits
+                                delegate: ColumnLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true; spacing: 4
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: modelData.label; color: "#d9dced"; font.pixelSize: 13 }
+                                        Item { Layout.fillWidth: true }
+                                        Text { text: modelData.percent + "%"; color: "#e9d7ca"; font.pixelSize: 13; font.bold: true }
+                                    }
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.preferredHeight: 7; radius: 4; color: "#353846"
+                                        Rectangle { width: parent.width * Math.max(0, Math.min(1, modelData.percent / 100)); height: parent.height; radius: parent.radius; color: modelData.percent >= 80 ? "#ef8b8b" : "#c9cbf5" }
+                                    }
+                                    Text { text: barWindow.formatLimitReset(modelData.reset); color: "#8d91a8"; font.pixelSize: 11 }
+                                }
+                            }
+                            Rectangle {
+                                visible: barWindow.agentLimits.length === 0
+                                Layout.fillWidth: true; Layout.preferredHeight: visible ? 52 : 0; radius: 7; color: "#252833"
+                                Text { anchors.fill: parent; anchors.margins: 10; text: barWindow.selectedAgent === "antigravity" ? "Antigravity does not expose account limits locally." : "No usage-limit record is available yet."; color: "#b9bdce"; font.pixelSize: 12; wrapMode: Text.Wrap; verticalAlignment: Text.AlignVCenter }
+                            }
                         }
                     }
                 }
@@ -959,12 +1025,9 @@ ShellRoot {
                     // vertical reveal for the network surface.
                     // The flares are drawn outside the sheet, so the window
                     // has to be wider than the sheet by one radius per side.
-                    property int flare: 22
-                    implicitWidth: Math.min(720, barWindow.width - 48) + flare * 2
-                    implicitHeight: 690
+                    implicitWidth: Math.min(720, barWindow.width - 48) + 44
+                    implicitHeight: 500
                     id: wifiPopup
-                    property real revealY: -implicitHeight
-                    onVisibleChanged: revealY = visible ? 0 : -implicitHeight
                     HyprlandFocusGrab {
                         active: barWindow.wifiOpen
                         windows: [barWindow, wifiPopup]
@@ -988,257 +1051,88 @@ ShellRoot {
                             wifiAnchor.rect.y = barWindow.height
                         }
                     }
-                    Rectangle {
-                        id: wifiSurface
-                        x: wifiPopup.flare
-                        y: wifiPopup.revealY
-                        width: parent.width - wifiPopup.flare * 2
-                        height: parent.height
-                        // Same colour as the bar (#171923), so the sheet reads
-                        // as an extension of it rather than a separate surface.
-                        // Square where it meets the bar so the flares continue
-                        // that edge into the sheet; rounded at the bottom.
-                        // Per-corner radii need Qt 6.7+; this runs on 6.11.
-                        topLeftRadius: 0
-                        topRightRadius: 0
-                        bottomLeftRadius: 26
-                        bottomRightRadius: 26
-                        color: "#171923"
-                        border.width: 1
-                        border.color: "#53586d"
-                        Behavior on y { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
-                        // Rectangle draws its border on all four sides, but
-                        // the top edge butts against the bar and the top
-                        // `flare` pixels of each side butt against an inverse
-                        // corner. Both runs read as a seam, so paint over them
-                        // in sheet colour; children draw above the parent's
-                        // own border.
-                        Rectangle {
-                            x: 0; y: 0
-                            width: parent.width; height: 2
-                            color: "#171923"
-                        }
-                        Rectangle {
-                            x: 0; y: 0
-                            width: 2; height: wifiPopup.flare
-                            color: "#171923"
-                        }
-                        Rectangle {
-                            x: parent.width - 2; y: 0
-                            width: 2; height: wifiPopup.flare
-                            color: "#171923"
-                        }
-
-                        // The sheet starts at y = -690 and slides in, so a
-                        // paint requested when the popup becomes visible is
-                        // dropped: the flares are still far off-window. Repaint
-                        // as it travels; each flare is 22x22, so it is cheap.
-                        onYChanged: {
-                            wifiFlareLeft.requestPaint()
-                            wifiFlareRight.requestPaint()
-                        }
-
-                        // Inverse corners. Each is a square of sheet colour with
-                        // a quarter disc cut out of it, centred on the square's
-                        // bottom outer corner: full width where it meets the bar,
-                        // tapering to nothing one radius further down. They are
-                        // children of the sheet, so they ride the reveal
-                        // animation, and they sit outside its bounds, which QML
-                        // renders because the sheet does not clip.
-                        Canvas {
-                            id: wifiFlareLeft
-                            width: wifiPopup.flare; height: wifiPopup.flare
-                            x: -width
-                            y: 0
-                            Component.onCompleted: requestPaint()
-                            onPaint: {
-                                var r = width
-                                var ctx = getContext("2d")
-                                ctx.reset()
-                                ctx.beginPath()
-                                ctx.moveTo(0, 0)
-                                ctx.lineTo(r, 0)
-                                ctx.lineTo(r, r)
-                                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
-                                ctx.closePath()
-                                ctx.fillStyle = "#171923"
-                                ctx.fill()
-                                ctx.beginPath()
-                                ctx.arc(0, r, r, 0, -Math.PI / 2, true)
-                                ctx.strokeStyle = "#53586d"
-                                ctx.lineWidth = 1
-                                ctx.stroke()
-                            }
-                        }
-                        Canvas {
-                            id: wifiFlareRight
-                            width: wifiPopup.flare; height: wifiPopup.flare
-                            x: parent.width
-                            y: 0
-                            Component.onCompleted: requestPaint()
-                            onPaint: {
-                                var r = width
-                                var ctx = getContext("2d")
-                                ctx.reset()
-                                ctx.beginPath()
-                                ctx.moveTo(r, 0)
-                                ctx.lineTo(0, 0)
-                                ctx.lineTo(0, r)
-                                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
-                                ctx.closePath()
-                                ctx.fillStyle = "#171923"
-                                ctx.fill()
-                                ctx.beginPath()
-                                ctx.arc(r, r, r, Math.PI, Math.PI * 1.5, false)
-                                ctx.strokeStyle = "#53586d"
-                                ctx.lineWidth = 1
-                                ctx.stroke()
-                            }
-                        }
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            anchors.topMargin: 18
-                            spacing: 8
-                        Rectangle {
-                            width: parent.width
-                            height: 66
-                            radius: 8
-                            color: "#2d3139"
-                            RowLayout {
+                    NotchedSheet {
+                        anchors.fill: parent
+                        active: barWindow.wifiOpen
+                    Column {
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 12
-                                Text { text: "󰤨"; color: "#8ab4f8"; font.pixelSize: 28 }
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
-                                    Text { text: barWindow.wifiNetworkName; color: "#f1f3f4"; font.pixelSize: 18; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { text: "Connected"; color: "#aeb4bf"; font.pixelSize: 12 }
+                                anchors.margins: 16
+                                anchors.topMargin: 20
+                                spacing: 10
+                            Rectangle {
+                                id: wifiHeaderCard
+                                width: parent.width
+                                height: 84
+                                radius: 8
+                                color: wifiHeaderHover.containsMouse ? "#363b45" : "#2d3139"
+                                // The full network UI lives in iwgtk; this panel
+                                // is a status readout, so hand off rather than
+                                // reimplement scanning and connecting.
+                                MouseArea {
+                                    id: wifiHeaderHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        Quickshell.execDetached(["iwgtk"])
+                                        barWindow.closePopups("")
+                                    }
                                 }
-                            }
-                        }
-                        GridLayout {
-                            width: parent.width
-                            columns: 2
-                            rowSpacing: 8
-                            columnSpacing: 8
-                            Repeater {
-                                model: [
-                                    { label: "Ping", value: barWindow.wifiPingText, accent: true },
-                                    { label: "Packet loss", value: barWindow.wifiPacketLossText },
-                                    { label: "Receiving", value: barWindow.wifiReceivingText },
-                                    { label: "Sending", value: barWindow.wifiSendingText },
-                                    { label: "Downloaded", value: barWindow.wifiDownloadedText },
-                                    { label: "Uploaded", value: barWindow.wifiUploadedText },
-                                    { label: "IP address", value: barWindow.wifiIpText },
-                                    { label: "Gateway", value: barWindow.wifiGatewayText },
-                                    { label: "Wi‑Fi band", value: barWindow.wifiBandText },
-                                    { label: "DNS", value: barWindow.wifiDnsText }
-                                ]
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 52
-                                    radius: 8
-                                    color: "#292b30"
-                                    Column {
-                                        anchors.fill: parent
-                                        anchors.margins: 9
-                                        spacing: 4
-                                        Text { text: modelData.label.toUpperCase(); color: "#9aa0aa"; font.pixelSize: 10; font.bold: true }
-                                        Text { text: modelData.value; color: modelData.accent ? "#8ab4f8" : "#e8eaed"; font.family: "monospace"; font.pixelSize: 14; elide: Text.ElideRight; width: parent.width }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 12
+                                    Text { text: "󰤨"; color: "#8ab4f8"; font.pixelSize: 34 }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 2
+                                        Text { text: barWindow.wifiNetworkName; color: "#f1f3f4"; font.pixelSize: 24; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+                                        Text { text: "Connected"; color: "#aeb4bf"; font.pixelSize: 15 }
                                     }
                                 }
                             }
-                        }
-                        Rectangle { width: parent.width; height: 1; color: "#3b3d42" }
-                        Text { text: "DNS PROVIDER"; color: "#9aa0aa"; font.pixelSize: 11; font.bold: true }
-                        RowLayout {
-                            width: parent.width
-                            spacing: 6
-                            Repeater {
-                                model: ["DHCP", "Cloudflare", "Google"]
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 38
-                                    radius: 6
-                                    color: barWindow.wifiDnsProviderText === modelData ? "#3b4658" : "#292b30"
-                                    border.width: 1
-                                    border.color: barWindow.wifiDnsProviderText === modelData ? "#8ab4f8" : "#41444b"
-                                    Text { anchors.centerIn: parent; text: modelData; color: parent.border.color; font.pixelSize: 12 }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        enabled: barWindow.wifiInterface !== "" && !wifiDnsProcess.running
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        onClicked: barWindow.setDnsProvider(modelData)
-                                    }
-                                }
-                            }
-                        }
-                        Rectangle { width: parent.width; height: 1; color: "#3b3d42" }
-                        Text { text: "KNOWN NETWORKS"; color: "#9aa0aa"; font.pixelSize: 11; font.bold: true }
-                        Column {
-                            width: parent.width
-                            spacing: 4
-                            Repeater {
-                                model: {
-                                    var names = barWindow.wifiKnownNetworks.slice()
-                                    if (barWindow.wifiNetworkName !== "Disconnected" && names.indexOf(barWindow.wifiNetworkName) < 0) names.unshift(barWindow.wifiNetworkName)
-                                    return names.slice(0, 3)
-                                }
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    width: parent.width
-                                    height: 46
-                                    radius: 7
-                                    color: modelData === barWindow.wifiNetworkName ? "#3b4658" : "#292b30"
-                                    Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "󰤨  " + modelData; color: "#e8eaed"; font.pixelSize: 14 }
-                                    Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: barWindow.wifiConnectingName === modelData ? "Connecting…" : (modelData === barWindow.wifiNetworkName ? "Connected" : "Connect"); color: "#8ab4f8"; font.pixelSize: 12 }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        enabled: modelData !== barWindow.wifiNetworkName && barWindow.wifiConnectingName === "" && barWindow.wifiInterface !== ""
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        onClicked: {
-                                            barWindow.wifiConnectingName = modelData
-                                            wifiConnectProcess.command = ["iwctl", "station", barWindow.wifiInterface, "connect", modelData]
-                                            wifiConnectProcess.running = true
+                            GridLayout {
+                                width: parent.width
+                                columns: 2
+                                rowSpacing: 10
+                                columnSpacing: 10
+                                Repeater {
+                                    model: [
+                                        { label: "Ping", value: barWindow.wifiPingText, accent: true },
+                                        { label: "Packet loss", value: barWindow.wifiPacketLossText },
+                                        { label: "Receiving", value: barWindow.wifiReceivingText },
+                                        { label: "Sending", value: barWindow.wifiSendingText },
+                                        { label: "Downloaded", value: barWindow.wifiDownloadedText },
+                                        { label: "Uploaded", value: barWindow.wifiUploadedText },
+                                        { label: "IP address", value: barWindow.wifiIpText },
+                                        { label: "Gateway", value: barWindow.wifiGatewayText },
+                                        { label: "Wi‑Fi band", value: barWindow.wifiBandText },
+                                        { label: "DNS", value: barWindow.wifiDnsText }
+                                    ]
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 66
+                                        radius: 8
+                                        color: "#292b30"
+                                        Column {
+                                            anchors.fill: parent
+                                            anchors.margins: 11
+                                            spacing: 5
+                                            Text { text: modelData.label.toUpperCase(); color: "#9aa0aa"; font.pixelSize: 12; font.bold: true }
+                                            Text { text: modelData.value; color: modelData.accent ? "#8ab4f8" : "#e8eaed"; font.family: "monospace"; font.pixelSize: 18; elide: Text.ElideRight; width: parent.width }
                                         }
                                     }
                                 }
                             }
-                        }
-                        Text { text: "OTHER NETWORKS"; color: "#9aa0aa"; font.pixelSize: 11; font.bold: true }
-                        Column {
-                            width: parent.width
-                            spacing: 3
-                            Text {
-                                visible: barWindow.wifiOtherNetworks.length === 0
-                                text: "Scanning for networks…"
-                                color: "#9aa0aa"
-                                font.pixelSize: 12
-                            }
-                            Repeater {
-                                model: barWindow.wifiOtherNetworks.slice(0, 4)
-                                delegate: Text {
-                                    required property string modelData
-                                    width: parent.width
-                                    text: "󰤪  " + modelData
-                                    color: "#c8ccd4"
-                                    font.pixelSize: 14
-                                    elide: Text.ElideRight
-                                }
-                            }
-                        }
+                                                    }
                     }
-                }
                     }
 
                 PopupWindow {
                     visible: barWindow.powerOpen
-                    color: "#1b1d27"
-                    implicitWidth: 430
+                    color: "transparent"
+                    implicitWidth: 430 + 44
                     implicitHeight: 390
                     id: powerPopup
                     HyprlandFocusGrab {
@@ -1251,78 +1145,77 @@ ShellRoot {
                         edges: Edges.Top | Edges.Right
                         gravity: Edges.Bottom | Edges.Right
                         rect.x: barWindow.width - 18
-                        rect.y: barWindow.height + 8
+                        rect.y: barWindow.height
                         rect.width: 1
                         rect.height: 1
                     }
-                    ColumnLayout {
+                    NotchedSheet {
                         anchors.fill: parent
-                        anchors.margins: 18
-                        opacity: barWindow.powerOpen ? 1 : 0
-                        scale: barWindow.powerOpen ? 1 : 0.96
-                        transformOrigin: Item.TopRight
-                        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                        spacing: 12
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "󰁹"; color: "#c9cbf5"; font.pixelSize: 30 }
-                            ColumnLayout {
-                                spacing: 1
-                                Text { text: "Battery"; color: "#eceefe"; font.pixelSize: 19; font.bold: true }
-                                Text { text: barWindow.batteryStatus.toUpperCase(); color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                        active: barWindow.powerOpen
+                    ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 12
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "󰁹"; color: "#c9cbf5"; font.pixelSize: 30 }
+                                ColumnLayout {
+                                    spacing: 1
+                                    Text { text: "Battery"; color: "#eceefe"; font.pixelSize: 19; font.bold: true }
+                                    Text { text: barWindow.batteryStatus.toUpperCase(); color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                                }
+                                Item { Layout.fillWidth: true }
+                                Text {
+                                    readonly property real charge: barWindow.correctedFraction >= 0 ? barWindow.correctedFraction : 0
+                                    text: Math.round(charge * 100) + "%"
+                                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                                    color: "#d9dbff"; font.pixelSize: 40
+                                }
                             }
-                            Item { Layout.fillWidth: true }
-                            Text {
-                                readonly property real charge: barWindow.correctedFraction >= 0 ? barWindow.correctedFraction : 0
-                                text: Math.round(charge * 100) + "%"
-                                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                                color: "#d9dbff"; font.pixelSize: 40
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 12; radius: 6; color: "#2c2f3d"
                             Rectangle {
-                                width: parent.width * Math.max(0, Math.min(1, barWindow.correctedFraction >= 0 ? barWindow.correctedFraction : 0))
-                                height: parent.height; radius: parent.radius; color: "#c9cbf5"
+                                Layout.fillWidth: true; Layout.preferredHeight: 12; radius: 6; color: "#2c2f3d"
+                                Rectangle {
+                                    width: parent.width * Math.max(0, Math.min(1, barWindow.correctedFraction >= 0 ? barWindow.correctedFraction : 0))
+                                    height: parent.height; radius: parent.radius; color: "#c9cbf5"
+                                }
                             }
-                        }
-                        GridLayout {
-                            Layout.fillWidth: true; columns: 2; columnSpacing: 30; rowSpacing: 8
-                            Text { text: "Design capacity"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryCapacityText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Charge cycles"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryCyclesText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Charge limit"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryLimitText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Power profile"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryProfileText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Power draw"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryPowerText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Voltage"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryVoltageText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                            Text { text: "Current"; color: "#9da1bb"; font.pixelSize: 13 }
-                            Text { text: barWindow.batteryCurrentText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
-                        }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
-                        Text { text: "POWER PROFILE"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
-                        RowLayout {
-                            Layout.fillWidth: true; spacing: 8
-                            Repeater {
-                                model: ["Power saver", "Balanced", "Performance"]
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 7
-                                    readonly property bool selected: barWindow.batteryProfileText.toLowerCase().indexOf(modelData.toLowerCase()) >= 0
-                                    color: selected ? "#414357" : "#252833"
-                                    border.width: 1; border.color: selected ? "#74789c" : "#454858"
-                                    Text { anchors.centerIn: parent; text: powerProfileAction.running ? "Applying…" : modelData; color: parent.selected ? "#f0f1ff" : "#aeb2ca"; font.pixelSize: 13 }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        enabled: !powerProfileAction.running
-                                        hoverEnabled: true
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        onClicked: barWindow.setPowerProfile(modelData === "Power saver" ? "power-saver" : modelData.toLowerCase())
+                            GridLayout {
+                                Layout.fillWidth: true; columns: 2; columnSpacing: 30; rowSpacing: 8
+                                Text { text: "Design capacity"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryCapacityText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Charge cycles"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryCyclesText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Charge limit"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryLimitText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Power profile"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryProfileText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Power draw"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryPowerText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Voltage"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryVoltageText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                                Text { text: "Current"; color: "#9da1bb"; font.pixelSize: 13 }
+                                Text { text: barWindow.batteryCurrentText; color: "#e5e7fa"; font.pixelSize: 13; horizontalAlignment: Text.AlignRight; Layout.fillWidth: true }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#303342" }
+                            Text { text: "POWER PROFILE"; color: "#9da1bb"; font.pixelSize: 11; font.bold: true }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Repeater {
+                                    model: ["Power saver", "Balanced", "Performance"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        Layout.fillWidth: true; Layout.preferredHeight: 42; radius: 7
+                                        readonly property bool selected: barWindow.batteryProfileText.toLowerCase().indexOf(modelData.toLowerCase()) >= 0
+                                        color: selected ? "#414357" : "#252833"
+                                        border.width: 1; border.color: selected ? "#74789c" : "#454858"
+                                        Text { anchors.centerIn: parent; text: powerProfileAction.running ? "Applying…" : modelData; color: parent.selected ? "#f0f1ff" : "#aeb2ca"; font.pixelSize: 13 }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: !powerProfileAction.running
+                                            hoverEnabled: true
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: barWindow.setPowerProfile(modelData === "Power saver" ? "power-saver" : modelData.toLowerCase())
+                                        }
                                     }
                                 }
                             }
