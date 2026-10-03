@@ -99,15 +99,17 @@ def snapshot():
         cache_path.write_text(json.dumps(cache))
     except OSError:
         pass
-    hosts = {c["host"]["address"] for c in clients}
     targets = []
+    # Every window, terminals hosting a tmux client included. Such a host used
+    # to be dropped on the grounds that its tmux windows represent it better,
+    # but the two answer different questions: the tmux entries go to a specific
+    # window, while the host goes back to the terminal wherever it was left.
     for w in windows:
-        if w["address"] not in hosts:
-            targets.append(dict(kind="window", title=w["title"] or w["class"],
-                                appClass=w["class"],
-                                detail=f'{w["class"]} · workspace {w["workspace"]["name"]}',
-                                address=w["address"], current=w["address"] == active,
-                                rank=w.get("focusHistoryID", 999)))
+        targets.append(dict(kind="window", title=w["title"] or w["class"],
+                            appClass=w["class"],
+                            detail=f'{w["class"]} · workspace {w["workspace"]["name"]}',
+                            address=w["address"], current=w["address"] == active,
+                            rank=w.get("focusHistoryID", 999)))
     for line in optional("tmux", "list-windows", "-a", "-F", "#{session_id}\t#{window_id}\t#{session_name}\t#{window_index}\t#{window_name}").splitlines():
         session, win, name, index, title = line.split("\t", 4)
         candidates = sorted(clients, key=lambda c: (c["session"] != session, c["host"]["address"] != active, c["host"].get("focusHistoryID", 999)))
