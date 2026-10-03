@@ -63,7 +63,8 @@ async-backend = epoll
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
 
-# Fully opaque. This is ghostty's default, but stating it means a theme or a
-# future config cannot quietly introduce transparency.
-background-opacity = 1
+# Slightly translucent so HyprGlass has something to refract -- the glass
+# effect is tagged onto ghostty in hyprglass.conf, and behind a fully opaque
+# window it has nothing to work with. Blur stays off: the plugin does its own.
+background-opacity = 0.85
 background-blur = false
