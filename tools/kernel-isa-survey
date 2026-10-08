@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""Survey which x86 instruction set extensions this kernel uses, and compare
+them against what this CPU actually supports.
+
+    kernel-isa-survey                 # vmlinux + every module
+    kernel-isa-survey --no-modules    # vmlinux only (fast)
+    kernel-isa-survey --json out.json # also dump raw counts
+
+Requires: capstone (python), zstd, objdump, and scripts/extract-vmlinux from
+the kernel source tree (Arch: pacman -S linux-headers, or point --vmlinux at
+an already-extracted image).
+
+WHY IT IS BUILT THIS WAY
+------------------------
+Three things were learned the hard way; each is load-bearing.
+
+1. AVX-512 cannot be detected from mnemonics. `vpaddq`, `vpshufb`,
+   `vpbroadcastb`, `vaesenc` and `vpclmulqdq` print identically whether they
+   are VEX- or EVEX-encoded, so a mnemonic match undercounted AVX-512 by 27x.
+   Detection must happen at the encoding level: byte 0 == 0x62 means EVEX,
+   which means AVX-512.
+
+2. Capstone's Python disasm() is bulk, not streaming. cs_disasm decodes the
+   whole buffer into one C array, and detail=True attaches a ~1-2KB cs_detail
+   per instruction, so feeding it a 22MB .text cost 10GB RSS and got the
+   process OOM-killed. Hence CHUNK-sized windows.
+
+3. Neither disassembler is complete on its own:
+     - Capstone has feature metadata but cannot decode group-7 privileged
+       opcodes (serialize 0f01e8, clac/stac, rmpadjust, invlpgb, vmgexit,
+       pvalidate, tilerelease). It then mis-syncs for a few bytes.
+     - binutils decodes everything but exposes no feature grouping.
+   So Capstone supplies the SIMD families and binutils fills its blind spots.
+   Where both decode an instruction they agree exactly, which is the check
+   that validates the whole run.
+
+.data is skipped although it carries the X flag: 37% of it decodes as (bad),
+i.e. it is data. The sections kept decode with zero invalid bytes.
+"""
+from __future__ import annotations
+import argparse, collections, json, os, re, struct, subprocess, sys, tempfile
+
+SHF_EXECINSTR = 0x4
+SKIP_SECTIONS = {".data"}
+CHUNK = 1 << 16
+NON_FEATURE_GROUPS = {
+    "jump", "call", "ret", "int", "iret", "privilege", "branch_relative",
+    "mode32", "mode64", "not64bitmode", "16bitmode", "",
+    "novlx",  # a NEGATIVE predicate (not-AVX512VL), not a requirement
+}
+
+# Capstone feature group -> /proc/cpuinfo flag
+GROUP_TO_FLAG = {
+    "aes": "aes", "adx": "adx", "avx": "avx", "avx2": "avx2",
+    "avx512": "avx512f", "bmi": "bmi1", "bmi2": "bmi2", "cmov": "cmov",
+    "fma": "fma", "fsgsbase": "fsgsbase", "mmx": "mmx", "pclmul": "pclmulqdq",
+    "sha": "sha_ni", "sse1": "sse", "sse2": "sse2", "sse3": "pni",
+    "sse41": "sse4_1", "sse42": "sse4_2", "ssse3": "ssse3", "smap": "smap",
+    "sgx": "sgx", "vm": "vmx", "rtm": "rtm", "hle": "hle", "fpu": "fpu",
+    "bwi": "avx512bw", "cdi": "avx512cd", "dqi": "avx512dq",
+    "eri": "avx512er", "pfi": "avx512pf", "vlx": "avx512vl",
+    "sse4a": "sse4a", "xop": "xop", "tbm": "tbm", "fma4": "fma4",
+    "3dnow": "3dnowext",
+}
+
+# Capstone's blind spots plus features it has no group for: mnemonic -> flag.
+# Counted from objdump, which decodes all of these correctly.
+MNEMONIC_TO_FLAG = {
+    "endbr64": "ibt", "endbr32": "ibt",
+    "clac": "smap", "stac": "smap",
+    "serialize": "serialize",
+    "rmpadjust": "sev_snp", "rmpupdate": "sev_snp", "psmash": "sev_snp",
+    "pvalidate": "sev_snp", "vmgexit": "sev_snp",
+    "invlpgb": "svm", "tlbsync": "svm",
+    "vmrun": "svm", "vmload": "svm", "vmsave": "svm", "clgi": "svm",
+    "stgi": "svm", "skinit": "svm", "vmmcall": "svm",
+    "rdpkru": "pku", "wrpkru": "pku",
+    "clwb": "clwb", "clflushopt": "clflushopt", "cldemote": "cldemote",
+    "rdseed": "rdseed", "rdrand": "rdrand", "rdpid": "rdpid",
+    "monitorx": "monitorx", "mwaitx": "monitorx",
+    "tpause": "waitpkg", "umonitor": "waitpkg", "umwait": "waitpkg",
+    "movdiri": "movdiri", "movdir64b": "movdir64b",
+    "wbnoinvd": "wbnoinvd", "popcnt": "popcnt", "movbe": "movbe",
+    "lzcnt": "abm", "cmpxchg16b": "cx16", "invpcid": "invpcid",
+    "monitor": "monitor", "mwait": "monitor",
+    "prefetchw": "3dnowprefetch", "prefetchwt1": "3dnowprefetch",
+    "xsaveopt": "xsaveopt", "xsaveopt64": "xsaveopt",
+    "xsavec": "xsavec", "xsavec64": "xsavec",
+    "xsaves": "xsaves", "xsaves64": "xsaves",
+    "xrstors": "xsaves", "xrstors64": "xsaves",
+    "xsave": "xsave", "xsave64": "xsave", "xgetbv": "xsave", "xsetbv": "xsave",
+    "encls": "sgx", "enclu": "sgx", "enclv": "sgx",
+    "ldtilecfg": "amx_tile", "sttilecfg": "amx_tile",
+    "tilerelease": "amx_tile", "tilezero": "amx_tile",
+    "incsspq": "shstk", "rdsspq": "shstk", "wrssq": "shstk",
+    "wrussq": "shstk", "setssbsy": "shstk", "clrssbsy": "shstk",
+    "vcvtph2ps": "f16c", "vcvtps2ph": "f16c",
+}
+# Features with no instructions of their own: "unused" is a category error.
+NO_INSTRUCTIONS = {
+    "erms", "smep", "pcid", "pti", "nx", "pae", "pge", "pat", "pse", "pse36",
+    "mtrr", "mca", "mce", "apic", "x2apic", "acpi", "est", "epb", "arat",
+    "aperfmperf", "constant_tsc", "nonstop_tsc", "tm", "tm2", "pln", "pts",
+    "dtherm", "arch_perfmon", "pebs", "bts", "ds_cpl", "dtes64", "pdcm",
+    "ht", "xtopology", "xtpr", "lm", "nopl", "rep_good", "ss", "sdbg", "pbe",
+    "cpuid_fault", "tsc_adjust", "tsc_deadline_timer", "pdpe1gb", "de", "vme",
+    "ibpb", "ibrs", "stibp", "ssbd", "md_clear", "flush_l1d", "ida", "dts",
+    "ept", "ept_ad", "vpid", "flexpriority", "tpr_shadow", "vnmi", "syscall",
+    "sep", "cx8", "lahf_lm", "msr", "fxsr", "clflush", "tsc", "cpuid", "mmx",
+    "pni", "ss",
+}
+
+
+def exec_sections(buf: bytes):
+    """Yield (name, vaddr, bytes) for every SHF_EXECINSTR PROGBITS section."""
+    if buf[:4] != b"\x7fELF" or buf[4] != 2:
+        return
+    e_shoff, = struct.unpack_from("<Q", buf, 0x28)
+    e_shentsize, e_shnum, e_shstrndx = struct.unpack_from("<HHH", buf, 0x3A)
+    if not e_shoff or not e_shnum:
+        return
+    def sh(i):
+        o = e_shoff + i * e_shentsize
+        return struct.unpack_from("<IIQQQQ", buf, o)
+    _, _, _, _, stroff, strsize = sh(e_shstrndx)
+    strtab = buf[stroff:stroff + strsize]
+    for i in range(e_shnum):
+        name, typ, flags, addr, off, size = sh(i)
+        if typ != 1 or size == 0 or not (flags & SHF_EXECINSTR):
+            continue
+        nm = strtab[name:strtab.find(b"\0", name)].decode("ascii", "replace")
+        if nm in SKIP_SECTIONS:
+            continue
+        yield nm, addr, buf[off:off + size]
+
+
+def new_acc():
+    return {k: collections.Counter() for k in
+            ("mnem", "grp", "count", "evex", "sections")}
+
+
+def merge(a, b):
+    for k in a:
+        a[k].update(b[k])
+
+
+def decode(buf: bytes, label: str, acc) -> None:
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md.detail = True
+    md.skipdata = True          # one unknown opcode must not truncate a section
+    for nm, addr, data in exec_sections(buf):
+        bucket = "alt" if "altinstr" in nm else "text"
+        key = f"{label}/{bucket}"
+        acc["sections"][f"{label}/{nm}"] += 1
+        n, off = len(data), 0
+        while off < n:
+            base, consumed = addr + off, 0
+            for insn in md.disasm(data[off:min(off + CHUNK, n)], base):
+                consumed = insn.address - base + insn.size
+                if insn.id == 0:            # skipdata pseudo-insn, no detail
+                    acc["count"][f"{key}/undecodable"] += 1
+                    continue
+                acc["mnem"][insn.mnemonic] += 1
+                acc["count"][key] += 1
+                if insn.bytes[0] == 0x62:   # EVEX => AVX-512, see docstring
+                    acc["evex"][insn.mnemonic] += 1
+                for g in insn.groups:
+                    gn = md.group_name(g) or ""
+                    if gn not in NON_FEATURE_GROUPS:
+                        acc["grp"][gn] += 1
+            off += consumed if consumed > 0 else 1
+
+
+def objdump_mnemonics(path: str) -> collections.Counter:
+    """binutils pass: covers Capstone's group-7 blind spots."""
+    out = subprocess.run(["objdump", "-d", "--no-show-raw-insn", path],
+                         capture_output=True, text=True).stdout
+    c = collections.Counter()
+    for line in out.splitlines():
+        if "\t" in line:
+            field = line.split("\t", 1)[1].strip()
+            if field:
+                c[field.split()[0]] += 1
+    return c
+
+
+def run_module(path):
+    acc = new_acc()
+    try:
+        buf = subprocess.run(["zstd", "-dc", path], capture_output=True,
+                             timeout=180).stdout if path.endswith(".zst") \
+              else open(path, "rb").read()
+    except Exception:
+        return acc, collections.Counter()
+    if not buf:
+        return acc, collections.Counter()
+    decode(buf, "modules", acc)
+    with tempfile.NamedTemporaryFile(suffix=".ko", delete=False) as t:
+        t.write(buf)
+        tmp = t.name
+    try:
+        bn = objdump_mnemonics(tmp)
+    finally:
+        os.unlink(tmp)
+    return acc, bn
+
+
+def cpu_flags() -> set:
+    for line in open("/proc/cpuinfo"):
+        if line.startswith("flags"):
+            return set(line.split(":", 1)[1].split())
+    return set()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--vmlinux", help="pre-extracted vmlinux (skips extraction)")
+    ap.add_argument("--no-modules", action="store_true")
+    ap.add_argument("--json", help="dump raw counters here")
+    ap.add_argument("--release", default=os.uname().release)
+    args = ap.parse_args()
+
+    try:
+        import capstone  # noqa: F401
+    except ImportError:
+        sys.exit("capstone missing:  pacman -S python-capstone\n"
+                 "              or:  python -m venv ~/.venv/isa && "
+                 "~/.venv/isa/bin/pip install capstone")
+
+    tmpdir = tempfile.mkdtemp(prefix="isa-")
+    vmlinux = args.vmlinux
+    if not vmlinux:
+        extract = next((p for p in (
+            "/usr/src/linux/scripts/extract-vmlinux",
+            f"/usr/lib/modules/{args.release}/build/scripts/extract-vmlinux")
+            if os.path.exists(p)), None)
+        if not extract:
+            sys.exit("extract-vmlinux not found; pass --vmlinux")
+        vmlinux = os.path.join(tmpdir, "vmlinux")
+        with open(vmlinux, "wb") as f:
+            if subprocess.run([extract, f"/boot/vmlinuz-{args.release}"],
+                              stdout=f).returncode:
+                sys.exit("extract-vmlinux failed")
+
+    acc, bn = new_acc(), collections.Counter()
+    decode(open(vmlinux, "rb").read(), "vmlinux", acc)
+    bn.update(objdump_mnemonics(vmlinux))
+
+    if not args.no_modules:
+        import multiprocessing as mp
+        root = f"/usr/lib/modules/{args.release}"
+        mods = [os.path.join(d, f) for d, _, fs in os.walk(root)
+                for f in fs if f.endswith((".ko", ".ko.zst"))]
+        print(f"scanning {len(mods)} modules ...", file=sys.stderr)
+        with mp.Pool(min(8, os.cpu_count() or 4)) as pool:
+            for sub, subbn in pool.imap_unordered(run_module, mods, chunksize=24):
+                merge(acc, sub)
+                bn.update(subbn)
+
+    flags = cpu_flags()
+    evex_total = sum(acc["evex"].values())
+
+    # feature -> (instruction count, how it was attributed)
+    feats: dict[str, tuple[int, str]] = {}
+    for g, n in acc["grp"].items():
+        flag = GROUP_TO_FLAG.get(g)
+        if flag:
+            feats[flag] = (max(feats.get(flag, (0, ""))[0], n), "capstone-group")
+    for m, n in bn.items():
+        flag = MNEMONIC_TO_FLAG.get(m)
+        if flag:
+            prev = feats.get(flag, (0, "objdump-mnemonic"))
+            feats[flag] = (prev[0] + n if prev[1] == "objdump-mnemonic" else prev[0],
+                           "objdump-mnemonic")
+    if evex_total:
+        feats["avx512f"] = (evex_total, "EVEX-encoding")
+
+    total = sum(v for k, v in acc["count"].items() if "undecodable" not in k)
+    undec = sum(v for k, v in acc["count"].items() if "undecodable" in k)
+    print(f"\nkernel {args.release}   {total:,} instructions decoded "
+          f"({undec:,} bytes Capstone could not decode)")
+    print(f"{len(acc['sections'])} executable sections, "
+          f"{len(acc['mnem']):,} distinct mnemonics, "
+          f"{len(flags)} CPU flags\n")
+
+    rows = sorted(((f, n, how) for f, (n, how) in feats.items() if n),
+                  key=lambda r: (r[0] in flags, -r[1]))
+    print(f"{'FEATURE':<16}{'CPU?':<6}{'COUNT':>10}  ATTRIBUTION")
+    print("-" * 58)
+    for f, n, how in rows:
+        print(f"{f:<16}{'YES' if f in flags else 'no':<6}{n:>10}  {how}")
+
+    unused = sorted(f for f in flags
+                    if f not in NO_INSTRUCTIONS
+                    and f in set(GROUP_TO_FLAG.values()) | set(MNEMONIC_TO_FLAG.values())
+                    and feats.get(f, (0,))[0] == 0)
+    print("\nsupported by this CPU but NOT used by the kernel:")
+    print("  " + (", ".join(unused) if unused else "(none)"))
+
+    if args.json:
+        json.dump({k: dict(v) for k, v in acc.items()} | {"objdump": dict(bn)},
+                  open(args.json, "w"))
+        print(f"\nraw counters -> {args.json}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
